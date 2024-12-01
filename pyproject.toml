@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "autocommit"
+version = "0.1.0"
+description = "Automatically generate commit messages from changes"
+authors = ["Tristan Brugère <67050900+tbrugere@users.noreply.github.com>"]
+license = "Cecill-B"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+mistralai = "^1.2.3"
+pygit2 = "^1.16.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
