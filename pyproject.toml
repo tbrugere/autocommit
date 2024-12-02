@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Automatically generate commit messages from changes"
 authors = ["Tristan Brugère <67050900+tbrugere@users.noreply.github.com>"]
 license = "Cecill-B"
-readme = "README.md"
+readme = "README.rst"
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -13,7 +13,10 @@ pygit2 = "^1.16.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
+pytest-cov = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
