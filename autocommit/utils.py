@@ -6,13 +6,15 @@ from warnings import warn
 
 from pygit2.enums import ObjectType
 
-
-#############################################################################
-### Error management (not raised, but returned, for interaction with the llm)
-#############################################################################
+"""
+Error management (not raised, but returned, for interaction with the llm)
+-------------------------------------------------------------------------
+"""
 
 @dataclass
 class ReturnableError():
+    """An error message that can be returned by a function, and coverted to a string
+    (to be sent to the LLM)"""
     error_type: str
     message: str
 
@@ -36,13 +38,21 @@ class FileNewError(ReturnableError):
         super().__init__("NewFile", f"File {file} is new, cannot print diff")
 
 
-#############################################################################
-### Git utils
-#############################################################################
+"""
+Git utils
+---------
+
+Miscellaneous utilities for working with git objects
+"""
 
 def walk_tree(tree, *, base_path=()):
     """Walk a tree recursively and yield all blobs in the tree,
-    and their path relative to the root tree"""
+    and their path relative to the root tree
+
+    Args:
+        tree (Tree): The tree to walk
+        base_path (tuple, optional): The path to the current tree. Defaults to ().
+    """
     for item in tree:
         match item.type:
             case ObjectType.BLOB:
@@ -52,13 +62,25 @@ def walk_tree(tree, *, base_path=()):
             case _:
                 warn(f"Unexpected object type {item.type_str} in tree")
 
-###########################################################################$
-### Registering and binding commands
-### For use with the mistral tool api
-#############################################################################
+"""
+Registering and binding commands (tools)
+----------------------------------------
+
+The classes that follow are intendeded to automate usage of the 
+Mistral tool/function calling api 
+(see https://docs.mistral.ai/capabilities/function_calling/)
+
+It includes 
+
+- Automatic generation of the json representation of the tools
+- Binding of parameters (to handle local state. 
+    For example in this codebase, the git repository is passed as a bound parameter)
+
+"""
 
 @dataclass
 class Parameter():
+    """A parameter of a command"""
     name: str
     type: type
     description: str
@@ -75,6 +97,7 @@ class Parameter():
 
 @dataclass
 class Command():
+    """A command that can be called by the LLM"""
     name: str
     function: Callable
     parameters: dict[str, Parameter]
@@ -105,6 +128,16 @@ class Command():
         }
 
 class CommandRegister():
+    """The main class for registering commands / tools that can be called by the LLM
+
+    To add a command, use the `register` decorator.
+
+    To generate the json representation of the commands, use the `to_json` method. It will ignore the bindable parameters.
+
+    Args:
+        bindable_parameters (set[str]): The parameters that can be bound to a value locally (as opposed to being passed by the LLM)
+
+    """
 
     commands: dict[str, Command]
     bindable_parameters: set[str]
@@ -114,6 +147,16 @@ class CommandRegister():
         self.bindable_parameters = set(bindable_parameters)
 
     def register(self, description="", parameter_descriptions=None):
+        """Decorator to register a command
+
+        All parameters of the function should be decorated with a type among ``str``, ``int``, ``float``, ``bool`` (except for the bindable parameters). 
+        This function will use the type annotations to generate the json representation of the command.
+
+        Args:
+            description (str, optional): The description of the command. Defaults to "".
+            parameter_descriptions (dict[str, str], optional): The descriptions of the parameters. Defaults to "" for every command, but you should really change that.
+
+        """
         if parameter_descriptions is None: parameter_descriptions = {}
         def decorator(f):
             nonlocal description
@@ -143,23 +186,42 @@ class CommandRegister():
                          optional=p.default != inspect.Parameter.empty)
 
     def to_json(self):
+        """Generate the json representation of the commands. 
+        This can be passed directly as the tools parameters to :func:`Mistral.chat.complete`"""
         return  [ command.to_json() for command in self.commands.values() ]   
 
     def bind(self, **bound_parameters):
+        """Bind the parameters to the commands.
+
+        Args:
+            **bound_parameters: The parameters to bind
+        Returns:
+            BoundCommandRegister: A bound version of the command register.
+        """
         return BoundCommandRegister(self, bound_parameters)
 
 @dataclass
 class BoundCommandRegister():
+    """A command register with bound parameters.
+
+    This object behaves like the BoundCommandRegister, except bound commands can be accessed with the getitem operator like so:
+
+    .. code-block:: python
+        commands = CommandRegister(bindable_parameters=("df",))
+
+        @commands.register(
+                description="Get payment status of a transaction", 
+                parameter_descriptions={"transaction_id": "The transaction id.",})
+        def retrieve_payment_status(*, df: data, transaction_id: str) -> str:
+            ...
+
+        bound_commands = commands.bind(df=df)
+
+        bound_commands["retrieve_payment_status"](transaction_id="1234")
+
+    """
     command_register: CommandRegister
     bound_parameters: dict[str, object]
-
-    def bind(self, bindable_parameters, kwargs):
-        new_kwargs = {**kwargs}
-        for param in bindable_parameters:
-            if param not in self.bound_parameters:
-                raise ValueError(f"Parameter {param} not bound")
-            new_kwargs[param] = self.bound_parameters[param]
-        return new_kwargs
 
     def __getitem__(self, name):
         if name in self.command_register.commands:
@@ -168,6 +230,15 @@ class BoundCommandRegister():
         raise AttributeError(f"Command {name} not found")
 
     def bind_command(self, command: Command):
+        """Returns the bound version of the command
+        
+        Returns the underlying function of the command, with 
+        - the bound parameters already filled in
+        - ensuring that the returnable errors are changed into strings
+
+        In general, this is called by the :func:``__getitem__`` method, 
+        you should not have to call it directly.
+        """
         def bound_command(**kwargs):
             bound_parameters = self.bind(command.bindable_parameters, kwargs)
             result = command.function(**bound_parameters)
@@ -177,7 +248,16 @@ class BoundCommandRegister():
             return result
         return bound_command
 
+    def to_json(self):
+        """Generate the json representation of the commands.
+
+        This command simply calls the to_json method of the underlying command register.
+        """
+        return self.command_register.to_json()
+
     def handle_returnable_error(self, error: ReturnableError):
+        """Convert a returnable error to a string. 
+        This can be overriden in a subclass to handle the errors differently"""
         return str(error)
 
 
