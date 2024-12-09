@@ -1,10 +1,35 @@
 from dataclasses import dataclass
 import inspect
 from inspect import signature
+from logging import getLogger; log = getLogger(__name__)
+import time
 from typing import Callable
 from warnings import warn
 
+from mistralai import ToolTypedDict
 from pygit2.enums import ObjectType
+
+
+class RateLimiter():
+    rate_limit: float
+    last_call_time: float|None
+    """A simple rate limiter that sleeps for a given amount of time between calls"""
+    def __init__(self, rate_limit):
+        self.rate_limit = rate_limit
+        self.last_call_time = None
+
+    def __call__(self):
+        """allows using ``with rate_limiter():`` instead of ``with rate_limiter:``"""
+        return self
+
+    def __enter__(self):
+        if self.last_call_time is not None:
+            elapsed = time.time() - self.last_call_time
+            if elapsed < self.rate_limit:
+                time.sleep(self.rate_limit - elapsed)
+
+    def __exit__(self, *_):
+        self.last_call_time = time.time()
 
 """
 Error management (not raised, but returned, for interaction with the llm)
@@ -37,6 +62,9 @@ class FileNewError(ReturnableError):
     def __init__(self, file: str):
         super().__init__("NewFile", f"File {file} is new, cannot print diff")
 
+class ParameterError(ReturnableError):
+    def __init__(self, message: str):
+        super().__init__("ParameterError", message)
 
 """
 Git utils
@@ -185,7 +213,7 @@ class CommandRegister():
                          descriptions.get(p.name, ""), 
                          optional=p.default != inspect.Parameter.empty)
 
-    def to_json(self):
+    def to_json(self) -> ToolTypedDict:
         """Generate the json representation of the commands. 
         This can be passed directly as the tools parameters to :func:`Mistral.chat.complete`"""
         return  [ command.to_json() for command in self.commands.values() ]   
@@ -240,13 +268,43 @@ class BoundCommandRegister():
         you should not have to call it directly.
         """
         def bound_command(**kwargs):
-            bound_parameters = self.bind(command.bindable_parameters, kwargs)
+            bound_parameters = self.bind_parameters(command.bindable_parameters, kwargs)
+            if isinstance(bound_parameters, ReturnableError):
+                return self.handle_returnable_error(bound_parameters)
+            check_result = self.check_parameters(command, bound_parameters)
+            if check_result is not None: return self.handle_returnable_error(check_result)
+
             result = command.function(**bound_parameters)
             # potentially handle returnable errors here
             if isinstance(result, ReturnableError):
                 return self.handle_returnable_error(result)
             return result
         return bound_command
+
+    def bind_parameters(self, bindable_parameters, kwargs):
+        """Bind the parameters to the command, and return the bound parameters"""
+        for param in bindable_parameters:
+            if param in kwargs: 
+                log.error(f"Parameter {param} is bindable, it should not be passed")
+                return ParameterError(f"No such parameter: {param}")
+            kwargs[param] = self.bound_parameters[param]
+        return kwargs
+
+    def check_parameters(self, command: Command, kwargs):
+        """Check that the parameters are correct for the command"""
+        # 1. check that the given parameters are correct and the right typ
+        for name, value in kwargs.items():
+            if name in command.bindable_parameters: continue
+            if name not in command.parameters:
+                return ParameterError(f"No such parameter: {name}")
+            if not isinstance(value, command.parameters[name].type):
+                return ParameterError(f"Parameter {name} is not of the right type")
+
+        # 2. check that there are no missing parameters
+        for name, parameter in command.parameters.items():
+            if not parameter.optional and name not in kwargs:
+                return ParameterError(f"Missing parameter {name}")
+
 
     def to_json(self):
         """Generate the json representation of the commands.
