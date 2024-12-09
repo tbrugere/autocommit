@@ -1,4 +1,5 @@
 pyrightconfig.json
+.mistral-api-key
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
