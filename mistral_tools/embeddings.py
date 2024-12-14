@@ -4,6 +4,17 @@ import numpy as np
 
 from mistral_tools.utils import RateLimiter
 
+def get_n_tokens(input, model, tokenizer=None):
+    from mistral_common.protocol.instruct.messages import UserMessage
+    from mistral_common.protocol.instruct.request import ChatCompletionRequest
+    if tokenizer is None:
+        tokenizer = MistralTokenizer.from_model(model, strict=True)
+    tokenized = tokenizer.encode_chat_completion(ChatCompletionRequest(
+      messages=[UserMessage(content=input)],
+      model=model
+    ), )
+    return len(tokenized.tokens)
+
 class EmbeddingModel():
 
     client: Mistral
@@ -22,13 +33,7 @@ class EmbeddingModel():
         self.max_n_tokens = max_n_tokens
 
     def get_n_tokens(self, input):
-        from mistral_common.protocol.instruct.messages import UserMessage
-        from mistral_common.protocol.instruct.request import ChatCompletionRequest
-        tokenized = self.tokenizer.encode_chat_completion(ChatCompletionRequest(
-          messages=[UserMessage(content=input)],
-          model=self.model
-        ), )
-        return len(tokenized.tokens)
+        return get_n_tokens(input, self.model, self.tokenizer)
 
     def get_embeddings_batched(self, inputs):
         input_lengths = np.array([self.get_n_tokens(i) for i in inputs])
