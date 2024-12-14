@@ -5,11 +5,18 @@ description = "Automatically generate commit messages from changes"
 authors = ["Tristan Brugère <67050900+tbrugere@users.noreply.github.com>"]
 license = "Cecill-B"
 readme = "README.rst"
+packages = [
+    { include = "autocommit"}, 
+    { include = "mistral_tools"}, 
+    { include = "basic_rag"}, 
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"
 mistralai = "^1.2.3"
 pygit2 = "^1.16.0"
+faiss-cpu = "^1.9.0.post1"
+mistral-common = "^1.5.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
@@ -18,5 +25,8 @@ pytest-cov = "^6.0.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+autocommit = 'autocommit:main'
 
 [tool.pytest.ini_options]
