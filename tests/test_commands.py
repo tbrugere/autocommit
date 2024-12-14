@@ -7,7 +7,7 @@ import pytest
 
 print(sys.path)
 
-from autocommit.commands import cat, ls_files, diff_file
+from autocommit.commands import print_file, ls_files, diff_file
 from autocommit.utils import FileNotFoundReturnableError, FileIsBinaryReturnableError, FileUnchangedError, FileNewError
 
 
@@ -89,17 +89,17 @@ def test_repository(tmp_path: Path):
 
 def test_cat_staged_untracked_and_commited(test_repository):
     repo = test_repository
-    assert cat("directory/file1.txt", staged=True, repository=repo) == file1_staged_content
-    assert cat("directory/file1.txt", staged=False, repository=repo) == file1_commited_content
+    assert print_file("directory/file1.txt", staged=True, repository=repo) == file1_staged_content
+    assert print_file("directory/file1.txt", staged=False, repository=repo) == file1_commited_content
 
 def test_cat_untracked(test_repository):
     repo = test_repository
-    assert isinstance(cat("file2.txt", staged=True, repository=repo), FileNotFoundReturnableError)
+    assert isinstance(print_file("file2.txt", staged=True, repository=repo), FileNotFoundReturnableError)
 
 def test_cat_newfile(test_repository):
     repo = test_repository
-    assert isinstance(cat("file3.txt", staged=False, repository=repo), FileNotFoundReturnableError)
-    assert cat("file3.txt", staged=True, repository=repo) == file3_staged_content
+    assert isinstance(print_file("file3.txt", staged=False, repository=repo), FileNotFoundReturnableError)
+    assert print_file("file3.txt", staged=True, repository=repo) == file3_staged_content
 
 
 def test_ls_all(test_repository):

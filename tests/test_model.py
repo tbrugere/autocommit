@@ -8,8 +8,9 @@ from textwrap import dedent
 
 import pytest
 
-from autocommit.mistral_model import ModelConversation
-from autocommit.utils import CommandRegister, RateLimiter
+from mistral_tools.conversation import ModelConversation
+from mistral_tools.tool_register import CommandRegister
+from mistral_tools.utils import RateLimiter
 
 rate_limit = RateLimiter(1.05)
 

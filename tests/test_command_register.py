@@ -2,7 +2,7 @@ from typing import TypeAlias
 
 import pytest
 
-from autocommit.utils import Parameter, Command, CommandRegister
+from mistral_tools.tool_register import Parameter, Command, CommandRegister
 data: TypeAlias = str # I don't want to import pandas here, these functions are not getting called anyway
 
 @pytest.fixture
