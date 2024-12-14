@@ -19,7 +19,7 @@ class TextChunk():
     end_line: int
 
     def to_str(self):
-        return f"----{self.file_path}:l{self.start_line} to l{self.end_line}-----\n{self.text_chunk}"
+        return f"----{self.file_path}: l.{self.start_line} to l.{self.end_line}-----\n{self.text_chunk}"
 
 class RAGDatabase():
     """Simple RAG database implemented as 
@@ -99,16 +99,19 @@ class RAGDatabase():
 
         return chunks, chunk_starts, chunk_ends
 
-    def generate_index(self, files: Sequence[Path|bytes], *, api_key, chunk_size=25, overlap=5, file_paths: Sequence[str]|None = None):
+    def generate_index(self, files: Sequence[Path|bytes], *, api_key, chunk_size=25, overlap=5, file_paths: Sequence[str]|None = None, file_shas_to_skip = None):
         all_chunks = []
         all_chunk_starts = []
         all_chunk_ends = []
         all_hashes = []
         all_file_paths = []
         file_paths = file_paths or [str(file) for file in files]
+        if file_shas_to_skip is None: file_shas_to_skip = set()
+        else: file_shas_to_skip = set(file_shas_to_skip)
         for file, file_path in zip(files, file_paths):
             if isinstance(file, Path): hash = sha1(file.read_bytes())
             else: hash = sha1(file)
+            if hash.digest() in file_shas_to_skip: continue
             chunks, chunk_starts, chunk_ends = self.get_chunks(file, chunk_size=chunk_size, overlap=overlap)
             all_chunks += chunks
             all_chunk_starts += chunk_starts
@@ -151,4 +154,29 @@ class RAGDatabase():
         return chunks, scores[0]
 
         
+    def update_index(self, files: Sequence[Path|bytes], *, api_key, chunk_size=25, overlap=5, file_paths: Sequence[str]|None = None):
+        files_shas_in_db = self.db.execute("SELECT DISTINCT file_sha FROM rag").fetchall()
+        files_shas_in_db  = set([sha for sha, in files_shas_in_db])
+        new_shas = []
+        for file in files:
+            if isinstance(file, Path): hash = sha1(file.read_bytes())
+            else: hash = sha1(file).digest()
+            new_shas.append(hash)
+        new_shas = set(new_shas)
 
+
+        deleted_shas = tuple(new_shas - files_shas_in_db)
+
+        self.db.execute("CREATE TEMP TABLE deleted_shas (sha BLOB)")
+        self.db.executemany("INSERT INTO deleted_shas VALUES (?)", [(sha,) for sha in deleted_shas] )
+        self.db.commit()
+
+        deleted_shas_ids = self.db.execute("SELECT id FROM rag INNER JOIN deleted_shas ON rag.file_sha = deleted_shas.sha").fetchall()
+        self.db.execute("DELETE FROM rag WHERE file_sha IN deleted_shas")
+        self.db.execute("DROP TABLE deleted_shas")
+        self.index.remove_ids(np.array([id for id, in deleted_shas_ids]))
+        self.commit()
+
+        self.generate_index(files, api_key=api_key, chunk_size=chunk_size, 
+                            overlap=overlap, file_paths=file_paths, 
+                            file_shas_to_skip=files_shas_in_db)
