@@ -1,0 +1,11 @@
+Please print the commit message, following the instructions below:
+- Use correct formatting
+- use imperative mood
+- be terse. do not add unnecessary details
+- the message should start immediately with the title
+- the title should be no more than 80 characters, it should not be capitalized, and should have no quotes, and no period at the end or any punctuation.
+# - If there is no need for a body, just print "# no body" (with the pound sign). ONLY print "# no body" if the commit message is only a title.
+- If needed, add a body to explain further details (eg. why or how the changes were made). If there is no need for precisions, do not add a body.
+- the title and body should be separated by a blank line
+- ONLY write about changes that appear in the diff.
+- Do not print anything else than the commit message. Do not print what was not done, or tell about code that was not affected. Do not specify than no further details are needed. Do not talk about the commit message.

@@ -7,7 +7,9 @@ from pygit2.enums import FileStatus, ObjectType
 from pygit2.index import Index
 from pygit2.repository import Repository
 
-from .utils import FileIsBinaryReturnableError, FileNotFoundReturnableError, FileUnchangedError, FileNewError, walk_tree, CommandRegister
+from .utils import FileIsBinaryReturnableError, FileNotFoundReturnableError, FileUnchangedError, FileNewError, walk_tree
+
+from mistral_tools.tool_register import CommandRegister
 
 commands = CommandRegister(bindable_parameters=("repository",))
 
@@ -16,10 +18,10 @@ commands = CommandRegister(bindable_parameters=("repository",))
                    parameter_descriptions={
                        "file": "The file to print",
                        "start_line": "print from this line",
-                       "num_lines": "the maximum number of lines to print",
+                       "num_lines": "the maximum number of lines to print (set to 0 to print all)",
                        "staged": "whether to print the new version of the file is available"
                        })
-def cat(file: str, start_line: int=0, num_lines: int=20, staged:bool=True, *, repository: Repository):
+def print_file(file: str, start_line: int=0, num_lines: int=200, staged:bool=True, *, repository: Repository):
     """Print the contents of the file. 
 
     .. warning::
@@ -56,7 +58,7 @@ def cat(file: str, start_line: int=0, num_lines: int=20, staged:bool=True, *, re
     if blob.is_binary:
         return FileIsBinaryReturnableError(file)
 
-    end_line = start_line + num_lines
+    end_line = start_line + num_lines if num_lines > 0 else None
     return_data = StringIO()
     with BlobIO(blob, as_path="file") as f:
         # decode the binary output to text (using default system encoding)
@@ -64,7 +66,7 @@ def cat(file: str, start_line: int=0, num_lines: int=20, staged:bool=True, *, re
         for i, line in enumerate(f_text):
             if i >= start_line:
                 return_data.write(line)
-            if i >= end_line:
+            if end_line is None or i >= end_line:
                 break
 
     return return_data.getvalue()
@@ -167,3 +169,55 @@ def diff_file(file: str, context: int = 5, *, repository: Repository):
 
     return edited_text.getvalue()
 
+def diff_all_files(context: int = 5, *, repository: Repository, max_content_size=-1, max_totat_size=100_000):
+    """Print the diff between the staged version and the head for all modified files
+
+    Args:
+        context (int, optional): The number of lines of context to print. Defaults to 5.
+        repository (Repository): The current git repository
+    """
+    status = repository.status(untracked_files="no")
+    status_files = set(status.keys())
+
+
+    tree = repository.head.peel(ObjectType.COMMIT).tree
+    tree_files: set[str] = {"/".join(path) for path, _ in walk_tree(tree)}
+    index = repository.index
+    index.read()
+
+    all_files = status_files | tree_files
+
+    return_data = StringIO()
+
+    all_file_info = []
+
+    for file in all_files:
+        if file not in status: continue
+        stat = status[file]
+        content = None
+        status_text = ""
+        if stat & FileStatus.INDEX_NEW:
+            status_text = " (NEW)"
+            content = repository[index[file].id].data.decode()
+        if stat & FileStatus.INDEX_MODIFIED:
+            status_text = " (MODIFIED)"
+            content = diff_file(file, context=context, repository=repository)
+        if stat & FileStatus.INDEX_DELETED:
+            status_text = " (DELETED)"
+        if stat & FileStatus.INDEX_RENAMED:
+            status_text = " (RENAMED)"
+        if not status_text: continue
+
+        file_info = StringIO()
+
+        file_info.write(f"------------ {file} {status_text}------------\n")
+        if content: 
+            content = str(content)
+            if max_content_size > 0 and  len(content) > max_content_size: 
+                content = content[:max_content_size] + "\n[...]"
+            file_info.write(content)
+        file_info.write("\n")
+
+
+
+    return return_data.getvalue()

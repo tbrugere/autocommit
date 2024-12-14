@@ -1,0 +1,1 @@
+print the body of the commit message. Only print the body of the commit message, not the title, that you just printed. Do not forget to use correct formatting, and imperative mood and be terse. If there is no need for a body, just print "# no body" (with the pound sign). Otherwise, print the body of the commit message without the title.

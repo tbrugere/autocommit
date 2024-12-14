@@ -1,135 +1,142 @@
-from contextlib import contextmanager
-import json
-from logging import getLogger; log = getLogger(__name__)
-import time
-from typing import Any, Literal
-
-from mistralai import Mistral, MessagesTypedDict
-from mistralai import Messages, ToolMessage, UserMessage
+from io import StringIO
+from pathlib import Path
+import string
+from typing import Final
+from importlib import resources
 from pygit2.repository import Repository
 
-from autocommit.utils import BoundCommandRegister, RateLimiter
-from autocommit.commands import commands
-
-class ModelConversation():
-
-    model: str
-    messages: list[MessagesTypedDict|Messages] = []
-    tool_register: BoundCommandRegister|None
-    synced = False # keep track of whether messages added to the conversation have been sent to the model
-    rate_limiter: RateLimiter
+from autocommit.commands import commands, diff_all_files
+from autocommit.build_ragdb import get_project_ragdb
+from mistral_tools.conversation import ModelConversation
+from mistral_tools.utils import RateLimiter
 
 
-    def __init__(self, *, model, api_key, tool_register, rate_limit: float|RateLimiter=1.05):
-        self.model = model
-        self.client = Mistral(api_key = api_key)
-        self.tool_register = tool_register
-        self.synced = False
-        match rate_limit:
-            case RateLimiter(): self.rate_limiter = rate_limit
-            case float(): self.rate_limiter = RateLimiter(rate_limit)
+def get_prompt(prompt_file):
+    resource_files = resources.files("autocommit.mistral_model")
+    prompts = resource_files / "prompts"
+    lines = (prompts / prompt_file).read_text().splitlines()
+    lines = [l for l in lines if not l.startswith("#")] # remove comments
+    return "\n".join(lines)
 
-    def add_message(self, prompt):
-        log.debug("------------------ user message ------------------")
-        log.debug(prompt)
-        with self.changes_sync_state(False):
-            self.messages.append(UserMessage(content=prompt))
+def says_ready(content):
+    if not content: return False
+    last_line: str = content.splitlines()[-1]
+    last_line = last_line.strip()
+    last_line = last_line.translate({c: None for c in string.punctuation})
+    last_line = last_line.lower()
+    return last_line == "ready"
 
-
-    def send(self,*, tool_choice: Literal["any", "auto", "none"] = "auto"):
-        log.debug("sending messages")
-        if self.synced:
-            raise ValueError("Already synced, add messages before sending again")
-        if self.tool_register is not None:
-            tr_param = dict(
-                    tools=self.tool_register.to_json(), 
-                    tool_choice=tool_choice, )
-        else: tr_param = {}
-        response = self._inner_send(
-                model=self.model,
-                messages=self.messages,
-                **tr_param
-            )
-        assert response is not None and response.choices is not None
-        # for now, we always select the first choice
-        response = response.choices[0]
-        self.handle_response(response)
-        return response
-
-    def _inner_send(self, **send_params):
-        with self.changes_sync_state(True), self.rate_limiter:
-            return self.client.chat.complete(**send_params)
+def get_initial_prompt(include_diff=False, rag=False, *, repository: Repository, repo_path, n_context_chunks = 10, api_key, rate_limit):
+    start_prompt: str = get_prompt("start_prompt.txt")
+    s = StringIO()
+    s.write(start_prompt)
+    if include_diff:
+        s.write("\nHere is a summary of modified files:\n<diff>\n")
+        s.write(diff_all_files(repository=repository))
+        s.write("\n</diff>")
+    if rag:
+        rag_db = get_project_ragdb(Path(repo_path), rate_limit=rate_limit)
+        chunks, _ = rag_db.query(start_prompt, n_results=n_context_chunks, api_key=api_key)
+        s.write("\n Here is some relevant context:\n<context>\n")
+        for chunk in chunks:
+            if not chunk.text_chunk.strip(): continue # skip empty chunks
+            s.write(chunk.to_str())
+            s.write("\n")
+    return s.getvalue()
 
 
-    def handle_response(self, response):
-        response_message = response.message
-        tool_calls = response_message.tool_calls or []
-        self.messages.append(response_message)
-        for tool_call in tool_calls:
-            assert tool_call.type == "function"
-            tool_name = tool_call.function.name
-            tool_parameters = json.loads(tool_call.function.arguments)
-            call_id = tool_call.id
-            self.handle_tool_call(tool_name, tool_parameters, tool_call_id=call_id)
+def fix_formatting(content):
+    """Fixes formatting issues in the result
+
+    Despite my best effort in prompt engineering, the model keeps messing up the format
+    of the commit message. """
+
+    # remove extra newlines
+    content = content.strip()
+    content = content.replace("\n\n\n", "\n\n")
+    
+    # fix title formatting
+    lines = content.splitlines()
+    if len(lines) < 1:
+        return content
+    potential_prefixes = ["Title:", "Commit message:", "Body:", "Body"]
+    for num_line in range(len(lines)):
+        line = lines[num_line]
+        for prefix in potential_prefixes:
+            if line.lower().startswith(prefix.lower()):
+                line = line[len(prefix):]
+        lines[num_line] = line
+    title, *body= lines
+    title = title.strip()
+
+    title = title.strip('": ') # the model sometimes adds quotes around the title
+    # remove newlines at beginnig of body, I'll re-add them later
+    start_body = 0
+    while start_body < len(body) and body[start_body].strip() == "":
+        start_body += 1
+    body = body[start_body:]
+    if not body:
+        body = ["# no body"]
+
+    return f"{title}\n\n{'\n'.join(body)}"
 
 
-    def handle_tool_call(self, tool_name, tool_parameters, tool_call_id):
-        log.info(f"Calling {tool_name} with {tool_parameters}")
-        assert self.tool_register is not None, "tool_register is not set"
-        tool_result = self.tool_register[tool_name](**tool_parameters)
-        with self.changes_sync_state(False):
-            self.messages.append(ToolMessage(tool_call_id=tool_call_id, name=tool_name, content=tool_result))
 
-    @contextmanager
-    def changes_sync_state(self, state: bool):
-        """
-        context manager that sets the synced state to the given state
-        unless the content failed, in which case the sync state is assumed 
-        to be false (ie failure -> not synced)"""
-        try: yield
-        except: 
-            self.synced = False
-            raise
-        else: self.synced = state
-
-
-def main(api_key, repo_path, max_tool_uses=10):
-    agent = "ag:486412fc:20241118:untitled-agent:25c2b440"
-
+def main(api_key, repo_path, max_tool_uses=10, use_tools=False, use_rag=True, separate_title_body=False):
     repo = Repository(str(repo_path))
-    commands_bound = commands.bind(repo=repo)
+    if use_rag:
+        commands_bound = commands.bind(repository=repo)
+    else: commands_bound = None
 
+    rate_limit = RateLimiter(2)
 
-    start_prompt = "Here is a list of files in the codebase, outlining which files had changes. Please issue tool calls to understand the changes made in the commit and their purpose"
-    prompt = "Please issue tool calls, with explanations or write the final commit message. If you need more information, issue tool calls with explanations of why you are using these functions. If you need no more information, write the commit message. Do not forget to follow formatting instructions and use imperative mood."
-    final_prompt = "Please write the commit message. Do not forget to follow formatting instructions and use imperative mood."
+    system_prompt: Final[str] = get_prompt("system_prompt.txt")
+    prompt: Final[str] = get_prompt("exchange_prompt.txt")
+    title_prompt: Final[str] = get_prompt("title_prompt.txt")
+    final_prompt: Final[str] = get_prompt("final_prompt.txt")
+    not_separated_prompt: Final[str] = get_prompt("not_separated_prompt.txt")
+    # final_prompt: Final[str] = get_prompt("final_prompt.txt")
 
     # TODO possibliy prefix? to handle getting title and body
+    # also dummy too calls for information that will definitely be useful
 
-    conversation = ModelConversation(model=agent, api_key=api_key, tool_register=commands_bound)
+    model: Final[str] = "codestral-latest"
 
-    conversation.add_message(start_prompt)
-    response = conversation.send(tool_choice="any")
-    n_remaining_tool_uses = max_tool_uses - 1
+    conversation = ModelConversation(model=model, api_key=api_key, tool_register=commands_bound, system_prompt=system_prompt, rate_limit=rate_limit)
 
-    while n_remaining_tool_uses > 1:
-        conversation.add_message(prompt)
-        response = conversation.send(tool_choice="auto")
-        n_remaining_tool_uses -= 1
-        if not response.message.tool_calls:
-            break
-    else:
+    start_prompt = get_initial_prompt(include_diff=True, rag=use_rag, repository=repo, repo_path=repo_path, api_key=api_key, rate_limit=rate_limit)
+
+    if use_tools:
+        conversation.add_message(start_prompt)
+        response = conversation.send(tool_choice="any" if use_tools else "none")
+        n_remaining_tool_uses = max_tool_uses - 1
+
+        while n_remaining_tool_uses > 1:
+            # conversation.add_message(prompt)
+            response = conversation.send(tool_choice="auto")
+            n_remaining_tool_uses -= 1
+            if says_ready(response.message.content):
+                break
+            elif not response.message.tool_calls:
+                conversation.add_message(prompt)
+
+        conversation.add_message(title_prompt if separate_title_body else not_separated_prompt)
+    else: 
+        conversation.add_message(start_prompt + "\n" + (title_prompt if separate_title_body else not_separated_prompt))
+
+    if separate_title_body:
+        conversation.add_prefix("Title: ")
+        response_title = conversation.send(tool_choice="none")
         conversation.add_message(final_prompt)
-        response = conversation.send(tool_choice="none")
+        conversation.add_prefix("Body: ")
+        response_body = conversation.send(tool_choice="none")
 
-    return response.message.content
+        title = response_title.message.content
+        body = response_body.message.content
+        result = f"{title}\n\n{body}"
+    else:
+        conversation.add_prefix("Commit message: ")
+        response_title = conversation.send(tool_choice="none")
+        result = response_title.message.content
 
-
-
-
-
-    
-
-
-
-
+    return fix_formatting(result)

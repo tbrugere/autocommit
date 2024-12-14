@@ -1,0 +1,1 @@
+Print the title of the commit message. Only print the first line, the title. Do not forget to use correct formatting, and imperative mood and be terse. Use less than 80 characters. 
