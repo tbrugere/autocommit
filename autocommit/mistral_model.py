@@ -2,6 +2,7 @@ from io import StringIO
 from pathlib import Path
 import string
 from typing import Final
+from textwrap import dedent
 from importlib import resources
 from pygit2.repository import Repository
 
@@ -35,18 +36,35 @@ def get_initial_prompt(include_diff=False, rag=False, *,
     start_prompt: str = get_prompt("start_prompt.txt")
     s = StringIO()
     s.write(start_prompt)
-    if include_diff:
-        s.write("\nHere is a summary of modified files:\n<diff>\n")
-        s.write(diff_all_files(repository=repository))
-        s.write("\n</diff>")
+    diff_value = None
     if rag:
+        if diff_value is None: # get the diff if we haven't already
+            diff_value = diff_all_files(repository=repository)
         rag_db = get_project_ragdb(Path(repo_path), rate_limit=rate_limit)
-        chunks, _ = rag_db.query(start_prompt, n_results=n_context_chunks, api_key=api_key)
+        rag_prompt = dedent(f"""
+            Here are the changes in the codebase:
+            <diff>
+            {diff_value}
+            </diff>
+            What are the most relevant parts of the codebase 
+            that I should consider to understand these changes?
+            In particular, important parts of the readme, 
+            and definitions of functions or classes that are called in this code.
+            """)
+        chunks, _ = rag_db.query(rag_prompt, n_results=n_context_chunks, 
+                                 api_key=api_key)
         s.write("\n Here is some relevant context:\n<context>\n")
         for chunk in chunks:
             if not chunk.text_chunk.strip(): continue # skip empty chunks
             s.write(chunk.to_str())
             s.write("\n")
+        s.write("</context>\n")
+    if include_diff:
+        if diff_value is None:
+            diff_value = diff_all_files(repository=repository)
+        s.write("\nHere is a summary of modified files:\n<diff>\n")
+        s.write(diff_value)
+        s.write("\n</diff>")
     return s.getvalue()
 
 
