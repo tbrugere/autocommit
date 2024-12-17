@@ -150,7 +150,6 @@ Running autocommit
 def main():
     """Chooses the action to take based on the command line arguments"""
     parser = argument_parser()
-    print(sys.argv)
     args = parser.parse_args()
     # logging.basicConfig(level=args.loglevel)
     configure_logging(args.loglevel, logfile=args.logfile)
