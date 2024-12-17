@@ -17,10 +17,13 @@ mistralai = "^1.2.3"
 pygit2 = "^1.16.0"
 faiss-cpu = "^1.9.0.post1"
 mistral-common = "^1.5.1"
+pydantic = "^2.10.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
 pytest-cov = "^6.0.0"
+ruff = "^0.8.3"
+ruff-lsp = "^0.0.59"
 
 [build-system]
 requires = ["poetry-core"]

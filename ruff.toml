@@ -1,0 +1,15 @@
+[lint]
+select = ["E", "F", "D"]
+ignore = [
+    "E701", # multiple statements on one line (colon)
+    "F841", # local variable is assigned to but never used (already handled by typechecker)
+    "D400", # "first line should end with a period" (I disagree.)
+    "D415", # "first line should end with a period" (I disagree.)
+    "D107", # missing docstring in __init__ (Prefer docstring in class)
+    ]
+pydocstyle.convention = "google"
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = true

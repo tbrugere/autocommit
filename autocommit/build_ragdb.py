@@ -1,13 +1,14 @@
 import os
 from pathlib import Path
 
-from pygit2.enums import FileStatus, ObjectType
+from pygit2.enums import ObjectType
 from pygit2.repository import Repository
 
 from basic_rag import RAGDatabase
 from autocommit.utils import walk_tree
 
 def get_project_ragdb(repo_path, rate_limit=1.1):
+    """Get the RAG database from the ``.autocommit_storage_dir`` directory"""
     storage_dir = repo_path / ".autocommit_storage_dir"
     storage_dir.mkdir(exist_ok=True)
     return RAGDatabase(storage_dir / "rag.sqlite", storage_dir / "rag.index", rate_limit=rate_limit)
