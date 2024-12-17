@@ -12,6 +12,7 @@ from mistral_tools.utils import RateLimiter
 
 
 def get_prompt(prompt_file):
+    """Load a prompt from a resource file"""
     resource_files = resources.files("autocommit.mistral_model")
     prompts = resource_files / "prompts"
     lines = (prompts / prompt_file).read_text().splitlines()
@@ -19,6 +20,7 @@ def get_prompt(prompt_file):
     return "\n".join(lines)
 
 def says_ready(content):
+    """Check if the model says it is ready (for use with tool calling)"""
     if not content: return False
     last_line: str = content.splitlines()[-1]
     last_line = last_line.strip()
@@ -26,7 +28,10 @@ def says_ready(content):
     last_line = last_line.lower()
     return last_line == "ready"
 
-def get_initial_prompt(include_diff=False, rag=False, *, repository: Repository, repo_path, n_context_chunks = 10, api_key, rate_limit):
+def get_initial_prompt(include_diff=False, rag=False, *, 
+                       repository: Repository, repo_path, n_context_chunks = 10, 
+                       api_key, rate_limit):
+    """Get the initial prompt for the model"""
     start_prompt: str = get_prompt("start_prompt.txt")
     s = StringIO()
     s.write(start_prompt)
@@ -82,7 +87,9 @@ def fix_formatting(content):
 
 
 
-def main(api_key, repo_path, max_tool_uses=10, use_tools=False, use_rag=True, separate_title_body=False):
+def main(api_key, repo_path, max_tool_uses=10, use_tools=False, 
+         use_rag=True, separate_title_body=False):
+    """Generate a commit message"""
     repo = Repository(str(repo_path))
     if use_rag:
         commands_bound = commands.bind(repository=repo)
@@ -102,9 +109,12 @@ def main(api_key, repo_path, max_tool_uses=10, use_tools=False, use_rag=True, se
 
     model: Final[str] = "codestral-latest"
 
-    conversation = ModelConversation(model=model, api_key=api_key, tool_register=commands_bound, system_prompt=system_prompt, rate_limit=rate_limit)
+    conversation = ModelConversation(
+            model=model, api_key=api_key, tool_register=commands_bound, 
+            system_prompt=system_prompt, rate_limit=rate_limit)
 
-    start_prompt = get_initial_prompt(include_diff=True, rag=use_rag, repository=repo, repo_path=repo_path, api_key=api_key, rate_limit=rate_limit)
+    start_prompt = get_initial_prompt(include_diff=True, rag=use_rag, 
+        repository=repo, repo_path=repo_path, api_key=api_key, rate_limit=rate_limit)
 
     if use_tools:
         conversation.add_message(start_prompt)

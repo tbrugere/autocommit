@@ -1,13 +1,30 @@
 from argparse import ArgumentParser
 import functools as ft
 from logging import getLogger
-from typing import Any, Callable, ParamSpec, Protocol, TypeVar
+import os
+from pathlib import Path
+from typing import Any, Callable, Iterator, ParamSpec, Protocol, TypeVar
 from warnings import warn
 
+from pygit2 import Blob
 from pygit2.enums import ObjectType
 
 from mistral_tools.tool_register import ReturnableError
 log = getLogger(__name__)
+
+def get_api_key(key_file: Path|None = None, storage_dir: Path|None =None) -> str:
+    """Get the Mistral API key"""
+    if key_file is not None:
+        return key_file.read_text().strip()
+    if "MISTRAL_API_KEY" in os.environ:
+        return os.environ["MISTRAL_API_KEY"]
+    if storage_dir is not None:
+        api_key_file = storage_dir / "api_key"
+        if api_key_file.exists():
+            return api_key_file.read_text().strip()
+    raise ValueError("No api key found. "
+                    "Please specify a key file or set the $MISTRAL_API_KEY "
+                    "environment variable")
 
 """
 Error management (not raised, but returned, for interaction with the llm)
@@ -52,7 +69,7 @@ Git utils
 Miscellaneous utilities for working with git objects
 """
 
-def walk_tree(tree, *, base_path=()):
+def walk_tree(tree, *, base_path=()) -> Iterator[tuple[tuple[str, ...], Blob]]:
     """Walk a tree recursively
 
     Yield all blobs in the tree, and their path relative to the root tree

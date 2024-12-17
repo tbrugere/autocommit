@@ -1,11 +1,12 @@
 from pathlib import Path
 
 from autocommit.config import Config
+from autocommit.utils import get_api_key
 
 autocommit_storage_dir = Path(".autocommit_storage_dir")
 
 def add_storage_dir_to_exclude(gitdir: Path):
-    """adds .autocommit_storage_dir/ to the .git/info/exclude file
+    """Add .autocommit_storage_dir/ to the .git/info/exclude file
 
     unless it is already there. This serves to avoid tracking the storage directory,
     which contains the api key.
@@ -14,7 +15,8 @@ def add_storage_dir_to_exclude(gitdir: Path):
 
     exclude_path = gitdir / "info" / "exclude"
 
-    pattern_already_there = pattern in [line.strip() for line in exclude_path.read_text().splitlines()]
+    pattern_already_there = pattern in [line.strip() for line 
+                                        in exclude_path.read_text().splitlines()]
     if pattern_already_there:
         return
 
@@ -38,11 +40,10 @@ def check_repo_bare(repo: Path):
 
 def add_commit_hook(repo: Path, *, hook_name="prepare-commit-msg", hook_content):
     """Adds the commit hook to the repository"""
-    hook_path = repo / "hooks" / "prepare-commit-msg"
-
+    hook_path = repo / "hooks" / hook_name
 
     if not hook_path.exists():
-        hook_path.write_text(f"#!/bin/sh\n{autocommit_line}\n")
+        hook_path.write_text(f"#!/bin/sh\n{hook_content}\n")
         hook_path.chmod(0o755)
     else:
         lines = hook_path.read_text().splitlines()
@@ -62,6 +63,8 @@ def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None,
         debug=False, # must be manually enabled by editing the config file
     )
 
+    key = get_api_key(key)
+
     if isolation:
         raise NotImplementedError("Isolation is not implemented yet")
 
@@ -79,7 +82,7 @@ def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None,
     config.to_json_file(worktree / autocommit_storage_dir / "config.json")
 
     add_storage_dir_to_exclude(repo)
-    key_file = add_key_to_tree(key, worktree)
+    _= add_key_to_tree(key, worktree)
 
     # git hooks
     autocommit_line = 'exec autocommit git_prepare_commit_msg \"$@\"'
@@ -89,7 +92,8 @@ def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None,
     # build ragdb
     if enable_rag:
         from autocommit.build_ragdb import build_ragdb
-        add_commit_hook(repo, hook_name="post-commit", hook_content="exec autocommit post_commit")
+        add_commit_hook(repo, hook_name="post-commit", 
+                        hook_content="exec autocommit post_commit")
         build_ragdb(key, str(worktree), update=False)
 
 
