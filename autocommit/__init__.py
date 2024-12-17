@@ -2,52 +2,54 @@
 # This is to make the import / runs as snappy as possible
 # in particular
 # if this is imported as a library, there is no real need to have argparse imported
-# if this is run from command line, the command should be as responsive as possible (and in particular if the arguments are invalid, we should not wait for imports before warning the user)
+# if this is run from command line, the command should be as responsive as possible (and 
+# in particular if the arguments are invalid, we should not 
+# wait for imports before warning the user)
 import logging
-from logging import getLogger; log = getLogger(__name__)
+from logging import getLogger
 import os
 from pathlib import Path
 import sys
-from typing import TYPE_CHECKING
+from argparse import ArgumentParser, BooleanOptionalAction
 
-if TYPE_CHECKING:
-    from argparse import ArgumentParser
+from autocommit.utils import create_argument_parser
+log = getLogger(__name__)
 
-def main_argument_parser(parser: "ArgumentParser|None" = None):
-    from argparse import ArgumentParser
-    if parser is None:
-        parser = ArgumentParser(description="Automatically generate commit messages from changes, and print it to stdout")
+"""
+Argument parsers for the command line
+-------------------------------------
+"""
 
-    parser.add_argument("repo", help="Path to the repository", type=str, default=".", nargs='?')
-    parser.add_argument("--key-file" , help="File containing a Mistral api key", type=Path, default=None)
+@create_argument_parser(description="Automatically generate commit messages"
+                        " from changes, and print it to stdout")
+def run_argument_parser(parser: ArgumentParser): # noqa: D103
+    parser.add_argument("repo", help="Path to the repository", type=str, default=".", 
+                        nargs='?')
+    parser.add_argument("--key-file" , help="File containing a Mistral api key", 
+                        type=Path, default=None)
 
-    return parser
-
-def setup_argument_parser(parser: "ArgumentParser|None" = None):
-    from argparse import ArgumentParser, BooleanOptionalAction
-
-    if parser is None:
-        parser = ArgumentParser(description="Activate autocommit on the current git repository")
-    parser.add_argument("--isolation", action=BooleanOptionalAction, help="Run the program in isolation mode", default=True)
+@create_argument_parser(description="Setup autocommit in the current repository")
+def setup_argument_parser(parser: ArgumentParser): # noqa: D103
+    parser.add_argument("--isolation", action=BooleanOptionalAction,
+                        help="Run the program in isolation mode", default=True)
     parser.add_argument("repo", help="Path to the repository", type=str, default=".")
 
-    return parser
-
-def build_ragdb_argument_parser(parser: "ArgumentParser|None" = None):
-    from argparse import ArgumentParser
-    if parser is None:
-        parser = ArgumentParser(description="Generate a RAG database from a set of files")
+@create_argument_parser(description="Build or update the RAG database "
+                        "from the repository")
+def build_ragdb_argument_parser(parser: ArgumentParser): # noqa: D103
     parser.add_argument("--api-key", help="Mistral API key", type=str, required=False)
-    parser.add_argument("repo", nargs="?", help="Path to the repository", type=str, default=".")
+    parser.add_argument("repo", nargs="?", help="Path to the repository", 
+                        type=str, default=".")
 
+@create_argument_parser(description="handle the git prepare-commit-msg hook")
+def git_prepare_commit_msg_argument_parser(parser: ArgumentParser): # noqa: D103
+    parser.add_argument("message_file", type=Path)
+    parser.add_argument("commit_type", type=str)
+    parser.add_argument("sha", type=str, nargs="?")
 
-def argument_parser(parser: "ArgumentParser|None" = None):
-    # the import call is deliberately inside the function
-    # to avoid importing the argparse module if not running the package from cli
-    from argparse import ArgumentParser
-
-    if parser is None:
-        parser = ArgumentParser(description="Automatically generate commit messages from changes")
+@create_argument_parser(
+        description="Automatically generate commit messages from changes")
+def argument_parser(parser: ArgumentParser): # noqa: D103
     ############### logging (mostly stolen from https://stackoverflow.com/a/20663028/4948719)
     parser.add_argument(
         '-d', '--debug',
@@ -60,10 +62,15 @@ def argument_parser(parser: "ArgumentParser|None" = None):
         help="Be verbose",
         action="store_const", dest="loglevel", const=logging.INFO,
     )
-    subparsers = parser.add_subparsers(title="action", help="whether to install or run", dest="action")
+    parser.add_argument(
+        '--logfile',
+        type=Path, help="Log file to write to (implies --verbose)",
+        default=None
+    )
+    subparsers = parser.add_subparsers(title="action", dest="action")
 
     run_parser = subparsers.add_parser("run")
-    main_argument_parser(run_parser)
+    run_argument_parser(run_parser)
 
     setup_parser = subparsers.add_parser("setup")
     setup_argument_parser(setup_parser)
@@ -71,12 +78,37 @@ def argument_parser(parser: "ArgumentParser|None" = None):
     build_ragdb_parser = subparsers.add_parser("build-ragdb")
     build_ragdb_argument_parser(build_ragdb_parser)
 
-    return parser
+    git_prepare_commit_msg_parser = subparsers.add_parser("git_prepare_commit_msg")
+    git_prepare_commit_msg_argument_parser(git_prepare_commit_msg_parser)
 
-def configure_logging(loglevel): 
+def configure_logging(loglevel, logfile=None): 
+    """Configures the logging for the program
+
+    Enables logging (either to stderr or to a file) for the following packages:
+
+    - autocommit
+    - basic_rag
+    - mistral_tools
+
+    with the specified log level
+
+    Args:
+        loglevel (int): The log level
+        logfile (Path, optional): The file to log to. Defaults to None.
+    """
+    if logfile is not None:
+        logfile = Path(logfile)
+        logfile.parent.mkdir(exist_ok=True, parents=True)
+        if loglevel > logging.INFO:
+            loglevel = logging.INFO
     log.setLevel(loglevel)
-    formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s', datefmt='%H:%M:%S')
-    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter(
+            '%(asctime)s:%(levelname)s:%(name)s:%(message)s', 
+            datefmt='%H:%M:%S')
+    if logfile is not None:
+        handler = logging.FileHandler(logfile)
+    else:
+        handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     log.addHandler(handler)
 
@@ -88,11 +120,17 @@ def configure_logging(loglevel):
     basic_rag_logger.setLevel(loglevel)
     basic_rag_logger.addHandler(handler)
 
+"""
+Running autocommit
+------------------
+"""
+
 def main():
+    """Chooses the action to take based on the command line arguments"""
     parser = argument_parser()
     args = parser.parse_args()
     # logging.basicConfig(level=args.loglevel)
-    configure_logging(args.loglevel)
+    configure_logging(args.loglevel, logfile=args.logfile)
 
     match args.action:
         case "run":
@@ -103,11 +141,21 @@ def main():
         case "build-ragdb":
             from autocommit.build_ragdb import build_ragdb
             build_ragdb(args.api_key, args.repo)
+        case "git_prepare_commit_msg":
+            from autocommit.git_hooks import git_prepare_commit_msg
+            git_prepare_commit_msg(args.message_file, args.commit_type, args.sha)
         case _:
             raise ValueError(f"Unknown action {args.action}")
 
 
 def generate_commit_message(repo, key_file):
+    """The main function for autocommit,
+
+    called when runninng `autocommit run` from the command line.
+
+    This is a wrapper around :func:`autocommit.mistral_model.main` 
+    that loads the api key, and prints the commit message to stdout.
+    """
     from autocommit.mistral_model import main
     if key_file is not None: 
         key_file = Path(key_file)
@@ -119,7 +167,8 @@ def generate_commit_message(repo, key_file):
     elif "MISTRAL_API_KEY" in os.environ:
         api_key = os.environ["MISTRAL_API_KEY"]
     else:
-        raise ValueError("No api key found. Please specify a key file or set the MISTRAL_API_KEY environment variable")
+        raise ValueError("No api key found. Please specify a key file "
+                         "or set the MISTRAL_API_KEY environment variable")
     commit_message = main(api_key, repo)
     sys.stdout.write(str(commit_message))
 
