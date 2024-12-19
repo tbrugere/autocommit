@@ -14,14 +14,6 @@ from mistral_tools.utils import RateLimiter
 
 rate_limit = RateLimiter(1.05)
 
-@pytest.fixture
-def api_key():
-    if os.environ.get("MISTRAL_API_KEY"):
-        return os.environ["MISTRAL_API_KEY"]
-    api_key_path = Path(".mistral-api-key")
-    if api_key_path.exists():
-        return api_key_path.read_text().strip()
-    raise ValueError("No api key found, please fill the MISTRAL_API_KEY environment variable or create a .mistral-api-key file")
 
 def test_conversation(api_key):
     model = "mistral-large-latest"

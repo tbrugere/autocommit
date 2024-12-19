@@ -1,3 +1,4 @@
+"""Miscellaneous utility functions and classes"""
 import time
 
 class RateLimiter():
@@ -21,14 +22,16 @@ class RateLimiter():
         self.last_call_time = None
 
     def __call__(self):
-        """allows using ``with rate_limiter():`` instead of ``with rate_limiter:``"""
+        """Allows using ``with rate_limiter():`` instead of ``with rate_limiter:``"""
         return self
 
     def __enter__(self):
+        """Sleeps for the remaining time to reach the rate limit"""
         if self.last_call_time is not None:
             elapsed = time.time() - self.last_call_time
             if elapsed < self.rate_limit:
                 time.sleep(self.rate_limit - elapsed)
 
     def __exit__(self, *_):
+        """Updates the last call time"""
         self.last_call_time = time.time()

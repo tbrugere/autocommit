@@ -1,10 +1,16 @@
+from logging import getLogger
+
 from mistralai import Mistral
 from mistral_common.tokens.tokenizers.mistral import MistralTokenizer
+from mistralai.models.sdkerror import SDKError
 import numpy as np
 
 from mistral_tools.utils import RateLimiter
 
+log = getLogger(__name__)
+
 def get_n_tokens(input, model, tokenizer=None):
+    """Compute the number of tokens in the input"""
     from mistral_common.protocol.instruct.messages import UserMessage
     from mistral_common.protocol.instruct.request import ChatCompletionRequest
     if tokenizer is None:
@@ -16,26 +22,32 @@ def get_n_tokens(input, model, tokenizer=None):
     return len(tokenized.tokens)
 
 class EmbeddingModel():
+    """A wrapper around the Mistral API for getting embeddings"""
 
     client: Mistral
     model: str
     rate_limiter: RateLimiter
     tokenizer: MistralTokenizer
+    max_retries: int = 5
 
     max_n_tokens: int = 16384
 
 
-    def __init__(self, *, api_key, model, rate_limit: float|RateLimiter=1.1, max_n_tokens: int = 16384):
+    def __init__(self, *, api_key, model, rate_limit: float|RateLimiter=1.1, 
+                 max_n_tokens: int = 16384):
         self.model = model
         self.client = Mistral(api_key = api_key)
-        self.rate_limiter = rate_limit if isinstance(rate_limit, RateLimiter) else RateLimiter(rate_limit)
+        self.rate_limiter = rate_limit if isinstance(rate_limit, RateLimiter)\
+                else RateLimiter(rate_limit)
         self.tokenizer = MistralTokenizer.from_model(model, strict=True)
         self.max_n_tokens = max_n_tokens
 
     def get_n_tokens(self, input):
+        """Compute the number of tokens in the input"""
         return get_n_tokens(input, self.model, self.tokenizer)
 
     def get_embeddings_batched(self, inputs):
+        """Get the embeddings for a batch of inputs"""
         input_lengths = np.array([self.get_n_tokens(i) for i in inputs])
         filtered_mask = input_lengths >= self.max_n_tokens
         filtered = np.array(inputs, dtype=object)[~filtered_mask]
@@ -47,7 +59,10 @@ class EmbeddingModel():
 
 
     def get_embeddings_batched_filtered(self, inputs_filtered,):
-        """assumes all inputs are smaller than the max n tokens"""
+        """Get the embeddings for a batch of inputs without checks
+
+        assumes all inputs are smaller than the max n tokens
+        """
         batch_results = []
         inputs_it = iter(inputs_filtered)
         current_batch = []
@@ -71,8 +86,29 @@ class EmbeddingModel():
 
         return np.concatenate(batch_results, axis=0)
 
-
+    
     def get_batch_embeddings(self, batch):
+        """Get the embeddings for a batch of inputs smaller than the max n tokens
+
+        retries on rate limit errors
+        """
+        for _ in range(self.max_retries):
+            try:
+                return self._get_batch_embeddings(batch)
+            except SDKError as e:
+                if e.status_code != 429:
+                    raise
+                log.warning("Rate limit error, retrying "
+                            f"(error {e.status_code}: {e.message})")
+                # sleep twice the rate limit to be safe
+                with self.rate_limiter: pass
+                with self.rate_limiter: pass
+        else:
+            raise RuntimeError(f"Rate limit error after {self.max_retries} retries")
+
+
+    def _get_batch_embeddings(self, batch):
+        """Get the embeddings for a batch of inputs smaller than the max n tokens"""
         with self.rate_limiter: 
             embeddings_batch_response = self.client.embeddings.create(
                 model="mistral-embed",
@@ -80,6 +116,8 @@ class EmbeddingModel():
             )
         return np.array([d.embedding for d in  embeddings_batch_response.data])
 
-    # TODO: add a method to use https://docs.mistral.ai/capabilities/batch/ for high volumes
+
+    # TODO: add a method to use https://docs.mistral.ai/capabilities/batch/ 
+    # for high volumes
 
 

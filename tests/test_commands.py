@@ -5,8 +5,6 @@ from textwrap import dedent
 import pygit2
 import pytest
 
-print(sys.path)
-
 from autocommit.commands import print_file, ls_files, diff_file
 from autocommit.utils import FileNotFoundReturnableError, FileIsBinaryReturnableError, FileUnchangedError, FileNewError
 

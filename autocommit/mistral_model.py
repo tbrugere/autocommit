@@ -35,7 +35,6 @@ def get_initial_prompt(include_diff=False, rag=False, *,
     """Get the initial prompt for the model"""
     start_prompt: str = get_prompt("start_prompt.txt")
     s = StringIO()
-    s.write(start_prompt)
     diff_value = None
     if rag:
         if diff_value is None: # get the diff if we haven't already
@@ -59,21 +58,23 @@ def get_initial_prompt(include_diff=False, rag=False, *,
             s.write(chunk.to_str())
             s.write("\n")
         s.write("</context>\n")
+    s.write(start_prompt)
     if include_diff:
         if diff_value is None:
             diff_value = diff_all_files(repository=repository)
-        s.write("\nHere is a summary of modified files:\n<diff>\n")
+        s.write("<diff>\n")
         s.write(diff_value)
         s.write("\n</diff>")
     return s.getvalue()
 
 
 def fix_formatting(content):
-    """Fixes formatting issues in the result
+    """Fix formatting issues in the result.
 
-    Despite my best effort in prompt engineering, the model keeps messing up the format
-    of the commit message. """
-
+    Despite my best effort in prompt engineering,
+    the model keeps messing up the format
+    of the commit message.
+    """
     # remove extra newlines
     content = content.strip()
     content = content.replace("\n\n\n", "\n\n")
