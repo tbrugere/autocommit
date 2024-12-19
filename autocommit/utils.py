@@ -1,3 +1,4 @@
+"""Miscellaneous utilities for autocommit"""
 from argparse import ArgumentParser
 import functools as ft
 from logging import getLogger
@@ -165,3 +166,66 @@ def create_argument_parser(**argparse_kwargs) \
             return parser
         return wrapper
     return decorator
+
+
+"""
+Algorithms
+----------
+"""
+
+def compute_truncation(lengths, max_total_length):
+    r"""Figure out the truncation of the lengths to fit in max_total_length
+
+    Given a list of lengths ``[l_1...l_n]``, and a maximum total length ``L``,
+    figure out the maximum truncation index ``t``, such that the sum of the lengths
+    truncated at ``t`` is less than ``L``, ie
+
+    .. math::
+
+        \sum_{i=1}^n min(l_i, t) < L
+
+    Args:
+        lengths (list[int]): The list of lengths
+        max_total_length (int): The maximum total length
+    """
+    import numpy as np
+
+    # we add a dummy length of 0 
+    # which will make sure that there is one length smaller than the cutoff
+    lengths = np.array((*lengths, 0.) )
+
+    n, = lengths.shape
+    total_len = lengths.sum()
+    if total_len <= max_total_length:
+        return None
+
+    lengths.sort()
+
+    # the total length function is piecewise affine, with cuts at the lengths
+    # we first compte the total length at each value of li
+    # which is l0 + ... + li + li * (n - i + 1)
+    total_lengths: np.ndarray= (np.cumsum(lengths) 
+                           + lengths * np.arange(n-1, -1, -1))
+
+    first_working_index: int = np.searchsorted(total_lengths, 
+                                               max_total_length, 
+                                               side="left")
+
+    # must be >0 because of the dummy length
+    # must be <n because otherwise no need to cut
+    assert  0 < first_working_index < n
+
+    # we need to find the exact value of the cutoff
+    total_length_li = total_lengths[first_working_index]
+    total_length_li_1 = total_lengths[first_working_index - 1]
+    li = lengths[first_working_index]
+    li_1 = lengths[first_working_index - 1]
+
+    inverse_slope = (li - li_1) / (total_length_li - total_length_li_1)
+
+    t = li_1 + (max_total_length - total_length_li_1) * inverse_slope
+    t = int(np.floor(t))
+    return t
+
+    
+

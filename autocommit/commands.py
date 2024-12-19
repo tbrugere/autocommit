@@ -7,33 +7,39 @@ from pygit2.enums import FileStatus, ObjectType
 from pygit2.index import Index
 from pygit2.repository import Repository
 
-from .utils import FileIsBinaryReturnableError, FileNotFoundReturnableError, FileUnchangedError, FileNewError, walk_tree
+from .utils import ( FileIsBinaryReturnableError, FileNotFoundReturnableError, 
+                    FileUnchangedError, FileNewError, walk_tree, compute_truncation)
 
 from mistral_tools.tool_register import CommandRegister
 
 commands = CommandRegister(bindable_parameters=("repository",))
 
 
-@commands.register(description="Print the contents of the file", 
-                   parameter_descriptions={
-                       "file": "The file to print",
-                       "start_line": "print from this line",
-                       "num_lines": "the maximum number of lines to print (set to 0 to print all)",
-                       "staged": "whether to print the new version of the file is available"
-                       })
-def print_file(file: str, start_line: int=0, num_lines: int=200, staged:bool=True, *, repository: Repository):
-    """Print the contents of the file. 
+@commands.register(
+        description="Print the contents of the file", 
+        parameter_descriptions={
+           "file": "The file to print",
+           "start_line": "print from this line",
+           "num_lines": "the maximum number of lines to print (set to 0 to print all)",
+           "staged": "whether to print the new version of the file is available"
+})
+def print_file(file: str, start_line: int=0, num_lines: int=200, staged:bool=True, *,
+               repository: Repository):
+    """Print the contents of the file.
 
     .. warning::
         this command does not actually read anything from the working directory, 
         only from git objects and the staging area.
-        This is mainly for security reasons (we do not want to give the LLM access to the filesystem).
+        This is mainly for security reasons (we do not want to give the LLM access 
+                                             to the filesystem).
 
     Args:
         file (str): The file to print
         start_line (int, optional): The starting line. Defaults to 0.
         num_lines (int, optional): The number of lines to print. Defaults to 20.
-        staged (bool, optional): Whether to print the staged version of the file if available. Defaults to True. If False, or if the file is not in the staging area, the latest tracked version is used.
+        staged (bool, optional): Whether to print the staged version of the file 
+        if available. Defaults to True. If False, or if the file 
+        is not in the staging area, the latest tracked version is used.
         repository (Repository): The current git repository
     """
     object_id: Oid|None= None # git object id for the file we are looking for
@@ -76,10 +82,13 @@ def print_file(file: str, start_line: int=0, num_lines: int=200, staged:bool=Tru
                        "indicate_changes": "Whether to indicate changes in the files",
                        "only_changed": "Whether to only list files that have changes",
                        })
-def ls_files(indicate_changes: bool=True, only_changed: bool=False, *, repository: Repository):
+def ls_files(indicate_changes: bool=True, only_changed: bool=False, *, 
+             repository: Repository):
     """List all files in the repository
 
     Args:
+        indicate_changes (bool, optional): Whether to indicate changes in the files. 
+        only_changed (bool, optional): Whether to only list files that have changes.
         repository (Repository): The current git repository
 
     Returns:
@@ -117,11 +126,12 @@ def ls_files(indicate_changes: bool=True, only_changed: bool=False, *, repositor
 
     return return_data.getvalue()
 
-@commands.register(description="Print the diff between the staged version of the file and the head",
-                   parameter_descriptions={
-                       "file": "The file to print the diff of",
-                       "context": "The number of lines of context to print",
-                       })
+@commands.register(
+    description="Print the diff between the staged version of the file and the head",
+    parameter_descriptions={
+       "file": "The file to print the diff of",
+       "context": "The number of lines of context to print",
+})
 def diff_file(file: str, context: int = 5, *, repository: Repository):
     """Print the diff between the staged version of the file and the head
 
@@ -169,12 +179,17 @@ def diff_file(file: str, context: int = 5, *, repository: Repository):
 
     return edited_text.getvalue()
 
-def diff_all_files(context: int = 5, *, repository: Repository, max_content_size=-1, max_totat_size=100_000):
+def diff_all_files(context: int = 5, *, repository: Repository, max_content_size=-1, 
+                   max_total_size=100_000):
     """Print the diff between the staged version and the head for all modified files
 
     Args:
         context (int, optional): The number of lines of context to print. Defaults to 5.
         repository (Repository): The current git repository
+        max_content_size (int, optional): The maximum size of the content to print 
+            for one file
+        max_total_size (int, optional): The maximum total size of the content to print
+            if True, we automatically cut off the largest files to fit in this size
     """
     status = repository.status(untracked_files="no")
     status_files = set(status.keys())
@@ -187,7 +202,6 @@ def diff_all_files(context: int = 5, *, repository: Repository, max_content_size
 
     all_files = status_files | tree_files
 
-    return_data = StringIO()
 
     all_file_info = []
 
@@ -214,10 +228,23 @@ def diff_all_files(context: int = 5, *, repository: Repository, max_content_size
         if content: 
             content = str(content)
             if max_content_size > 0 and  len(content) > max_content_size: 
-                content = content[:max_content_size] + "\n[...]"
+                content = content[:max_content_size] + "\n[...]\n"
             file_info.write(content)
         file_info.write("\n")
+        all_file_info.append(file_info.getvalue())
 
+    all_file_info_len = [len(i) for i in all_file_info]
+    truncation = compute_truncation(all_file_info_len, max_total_size)
+    def truncate(s, t):
+        if t is None: return s
+        if len(s) <= t: return s
+        truncated_str = "\n[...]\n"
+        return s[:t - len(truncated_str)] + truncated_str
+    if truncation is not None:
+        all_file_info = [i[:truncation] for i in all_file_info]
 
+    return_data = StringIO()
+    for file_info in all_file_info:
+        return_data.write(file_info)
 
     return return_data.getvalue()
