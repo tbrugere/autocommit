@@ -93,7 +93,7 @@ def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None,
     if enable_rag:
         from autocommit.build_ragdb import build_ragdb
         add_commit_hook(repo, hook_name="post-commit", 
-                        hook_content="exec autocommit post_commit")
+                        hook_content="exec autocommit git_post_commit")
         build_ragdb(key, str(worktree), update=False)
 
 

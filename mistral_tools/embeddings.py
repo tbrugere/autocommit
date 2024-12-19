@@ -1,3 +1,4 @@
+"""A wrapper around the Mistral API for getting embeddings"""
 from logging import getLogger
 
 from mistralai import Mistral

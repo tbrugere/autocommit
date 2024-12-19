@@ -1,3 +1,4 @@
+"""High-level interface to the Mistral completion API"""
 from contextlib import contextmanager
 import json
 from logging import getLogger 
@@ -68,6 +69,9 @@ class ModelConversation():
         log.debug("------------------ simulated assistant message")
 
         tool_calls_with_id = []
+
+        if tool_calls is None:
+            tool_calls = {}
 
         for tool_name, tool_parameters in tool_calls.items():
             tool_call = ToolCall(
