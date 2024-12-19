@@ -75,7 +75,7 @@ def git_post_commit():
     _ = subprocess.run((autocommit_cmd,
                     "--logfile", str(dir.logfile), 
                     "build-ragdb", 
-                    "--api-key", str(dir.api_key_file), 
+                    "--key-file", str(dir.api_key_file), 
                     "--update",
                 ))
 
