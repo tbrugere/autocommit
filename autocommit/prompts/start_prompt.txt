@@ -1,6 +1,12 @@
 
+
 Here is a summary of modified files:
 escribe the following changes
-NLY describe the following changes. If a file was not changed
+ONLY describe the following changes. If a file was not changed
 do not mention it. If a file was changed, describe the changes.
-do not include any additional message.
+State WHAT was changed, WHY it was changed, and HOW it was changed.
+Be terse and to the point. You are a professionnal software engineer, not a novelist.
+Use imperative mood.
+Do not include any additional message. Do not say that no other changes were made, it is implied.
+
+

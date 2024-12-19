@@ -168,7 +168,7 @@ def diff_file(file: str, context: int = 5, *, repository: Repository):
     edited_text = StringIO()
     _ = next(patch_text_lines) # skip the first line
     edited_text.write(f"diff --git a/{file} b/{file}\n")
-    edited_text.write(next(patch_text_lines) + "\n"); # write the line with "index ..."
+    edited_text.write(next(patch_text_lines) + "\n") # write the line with "index ..."
     next(patch_text_lines) # skip the line with "---"
     next(patch_text_lines) # skip the line with "+++"
     edited_text.write(dedent(f"""\
