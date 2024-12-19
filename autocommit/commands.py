@@ -241,7 +241,7 @@ def diff_all_files(context: int = 5, *, repository: Repository, max_content_size
         truncated_str = "\n[...]\n"
         return s[:t - len(truncated_str)] + truncated_str
     if truncation is not None:
-        all_file_info = [i[:truncation] for i in all_file_info]
+        all_file_info = [truncate(i, truncation) for i in all_file_info]
 
     return_data = StringIO()
     for file_info in all_file_info:
