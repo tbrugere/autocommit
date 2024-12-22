@@ -43,6 +43,12 @@ class AutocommitDir():
     config_file: Path
     config: Config
 
+    def __post_init__(self):
+        """Resolve all paths to absolute paths"""
+        for var_name, path in vars(self).items():
+            if isinstance(path, Path):
+                setattr(self, var_name, path.resolve())
+
     @classmethod
     def from_dir(cls, data_path: Path):
         """Load the autocommit directory"""
