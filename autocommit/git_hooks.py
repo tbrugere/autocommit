@@ -58,8 +58,8 @@ def git_prepare_commit_msg(message_file: Path, commit_type: str, sha: str):
             log.error(f"Autocommit failed with return code {process.returncode}, "
                       "see {logfile} for details")
             out_file.write(f"# Autocommit failed with return code {process.returncode}"
-                           ", see {logfile} for details")
-            exit(process.returncode)
+                           f", see {dir.logfile} for details")
+            exit(0)
 
     log.info(f"Autocommit ran successfully, see {dir.logfile} for details")
 
