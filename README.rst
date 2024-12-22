@@ -3,7 +3,7 @@ Autocommit: automatically write commit messages
 
 Uses the `Mistral api <https://mistral.ai/>`_ to pre-generate a commit message for you.
 
-.. image:: doc/source/images/autocommit.gif
+.. image:: .readme-images/autocommit.gif
     :alt: Autocommit in action
 
 Features
@@ -42,7 +42,7 @@ This will
 Why ?
 -----
 
-.. figure:: doc/source/images/horror.png
+.. figure:: .readme-images/horror.png
     :alt: screenshot of commit messages whose message is simply "update"
 
     This is why
