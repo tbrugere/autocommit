@@ -70,14 +70,21 @@ def git_post_commit():
     # cwd should be the repository root
     dir = AutocommitDir.from_repo(Path.cwd())
 
+    if dir.config.isolation: 
+        raise NotImplementedError("Isolation is not implemented yet")
+
     # 1. run autocommit
     autocommit_cmd = argv[0]
-    _ = subprocess.run((autocommit_cmd,
+    process = subprocess.Popen((autocommit_cmd,
                     "--logfile", str(dir.logfile), 
                     "build-ragdb", 
                     "--key-file", str(dir.api_key_file), 
                     "--update",
-                ))
+                ), 
+                start_new_session=True) 
+    # runs in the background to not block the commit
+    # will not get killed even if the terminal is closed
+    del process
 
 
 
