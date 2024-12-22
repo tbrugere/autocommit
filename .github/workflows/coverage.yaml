@@ -18,6 +18,8 @@ jobs:
         run: make .make/deps .make/test-deps
       - name: run tests
         run: make .make/run-tests
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
       - name: Generate coverage report
         run: make coverage.xml
       - name: save coverage report
