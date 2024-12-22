@@ -119,8 +119,11 @@ class RAGDatabase():
             hash: the hash of the file (optional)
         """
         chunk_limits = chunk_size - overlap
-        if isinstance(file, Path): lines = file.read_text().splitlines()
-        else: lines = file.decode().splitlines()
+        try: 
+            if isinstance(file, Path): lines = file.read_text().splitlines()
+            else: lines = file.decode().splitlines()
+        except UnicodeDecodeError:
+            return [] # skip non-text files
         n_lines = len(lines)
         
         chunk_starts = range(0, n_lines, chunk_limits)

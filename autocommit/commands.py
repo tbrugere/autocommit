@@ -154,9 +154,15 @@ def diff_file(file: str, context: int = 5, *, repository: Repository):
     if file not in tree:
         return FileNewError(file)
 
+    blob_old = tree[file]
+    blob_new = repository[index[file].id]
+    assert isinstance(blob_old, Blob) and isinstance(blob_new, Blob)
+    if blob_old.is_binary or blob_new.is_binary:
+        return FileIsBinaryReturnableError(file)
+
     patch = repository.diff(
-            tree[file],
-            index[file].id, 
+            blob_old,
+            blob_new.id, 
             context_lines=context, interhunk_lines=2)
     assert isinstance(patch, Patch)
 
@@ -212,10 +218,12 @@ def diff_all_files(context: int = 5, *, repository: Repository, max_content_size
         status_text = ""
         if stat & FileStatus.INDEX_NEW:
             status_text = " (NEW)"
-            content = repository[index[file].id].data.decode()
+            try: content = repository[index[file].id].data.decode()
+            except UnicodeDecodeError: continue # skip binary files
         if stat & FileStatus.INDEX_MODIFIED:
             status_text = " (MODIFIED)"
             content = diff_file(file, context=context, repository=repository)
+            if content is None: content = "Binary file, cannot display diff\n"
         if stat & FileStatus.INDEX_DELETED:
             status_text = " (DELETED)"
         if stat & FileStatus.INDEX_RENAMED:
