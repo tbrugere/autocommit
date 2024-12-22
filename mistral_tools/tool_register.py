@@ -1,6 +1,4 @@
-"""
-Registering and binding commands (tools)
-----------------------------------------
+"""Registering and binding commands (tools)
 
 The classes that follow are intended to automate usage of the 
 Mistral tool/function calling api 
@@ -23,13 +21,22 @@ from mistralai import ToolTypedDict
 
 @dataclass
 class ReturnableError():
-    """An error message that can be returned by a function, and converted to a string
-    (to be sent to the LLM)"""
+    """An error message that can be returned by a function
+
+    and converted to a string (to be sent to the LLM)
+    """
     error_type: str
     message: str
 
     def __str__(self):
+        """Convert the error to a string"""
         return f"{self.error_type}: {self.message}"
+
+class ParameterError(ReturnableError):
+    """Returned by the tool calls if a parameter is incorrect"""
+
+    def __init__(self, message: str):
+        super().__init__("ParameterError", message)
 
 
 @dataclass
@@ -41,11 +48,12 @@ class Parameter():
     optional: bool
 
     def to_json(self):
+        """Convert the parameter to Mistral api json representation"""
         # TODO: handle more types as needed
-        if self.type == str: type_str = "string"
-        elif self.type == int: type_str = "integer"
-        elif self.type == bool: type_str = "boolean"
-        elif self.type == float: type_str = "number"
+        if self.type is str: type_str = "string"
+        elif self.type is int: type_str = "integer"
+        elif self.type is bool: type_str = "boolean"
+        elif self.type is float: type_str = "number"
         else: raise ValueError(f"Unsupported type {self.type}")
         return {"type": type_str, "description": self.description}
 
@@ -59,16 +67,18 @@ class Command():
     description: str
 
     def parameters_to_json(self):
+        """Convert the parameters to Mistral api json representation"""
         return {
                 "type": "object",
                 "properties": {
                     name: parameter.to_json()
                     for name, parameter in self.parameters.items()
                 }, 
-                "required": [name for name, parameter in self.parameters.items() if not parameter.optional]
+                "required": [name for name, parameter in self.parameters.items() 
+                             if not parameter.optional]
             }
 
-    def to_json_inner(self):
+    def _to_json_inner(self):
         return {
             "name": self.name,
             "description": self.description,
@@ -76,9 +86,10 @@ class Command():
         }
 
     def to_json(self):
+        """Convert the command to Mistral api json representation"""
         return {
             "type": "function",
-            "function": self.to_json_inner()
+            "function": self._to_json_inner()
         }
 
 class CommandRegister():
@@ -86,11 +97,12 @@ class CommandRegister():
 
     To add a command, use the `register` decorator.
 
-    To generate the json representation of the commands, use the `to_json` method. It will ignore the bindable parameters.
+    To generate the json representation of the commands, use the `to_json` method. 
+    It will ignore the bindable parameters.
 
     Args:
-        bindable_parameters (set[str]): The parameters that can be bound to a value locally (as opposed to being passed by the LLM)
-
+        bindable_parameters (set[str]): The parameters that can be bound to a value 
+            locally (as opposed to being passed by the LLM)
     """
 
     commands: dict[str, Command]
@@ -103,12 +115,16 @@ class CommandRegister():
     def register(self, description="", parameter_descriptions=None):
         """Decorator to register a command
 
-        All parameters of the function should be decorated with a type among ``str``, ``int``, ``float``, ``bool`` (except for the bindable parameters). 
-        This function will use the type annotations to generate the json representation of the command.
+        All parameters of the function should be decorated with a type among 
+        ``str``, ``int``, ``float``, ``bool`` (except for the bindable parameters). 
+        This function will use the type annotations to generate the 
+        json representation of the command.
 
         Args:
             description (str, optional): The description of the command. Defaults to "".
-            parameter_descriptions (dict[str, str], optional): The descriptions of the parameters. Defaults to "" for every command, but you should really change that.
+            parameter_descriptions (dict[str, str], optional): The descriptions of 
+            the parameters. Defaults to "" for every command, 
+            but you should really change that.
 
         """
         if parameter_descriptions is None: parameter_descriptions = {}
@@ -123,7 +139,8 @@ class CommandRegister():
                 if param.name in self.bindable_parameters:
                     bindable_parameters.add(param.name)
                 else: 
-                    parameters[param.name] = self.parameter_of_inspected(param, parameter_descriptions)
+                    parameters[param.name] = self.parameter_of_inspected(
+                            param, parameter_descriptions)
 
             command = Command(name, f, parameters, bindable_parameters, description)
             self.commands[name] = command
@@ -132,6 +149,7 @@ class CommandRegister():
 
     @staticmethod
     def parameter_of_inspected(p: inspect.Parameter, descriptions: dict[str, str]) -> Parameter:
+        """Generate a :class:`parameter` from inspecting a functions's parameters"""
         if p.annotation == inspect.Parameter.empty:
             raise ValueError(f"Parameter {p.name} has no type annotation")
         return Parameter(p.name, 
@@ -141,7 +159,10 @@ class CommandRegister():
 
     def to_json(self) -> ToolTypedDict:
         """Generate the json representation of the commands. 
-        This can be passed directly as the tools parameters to :func:`Mistral.chat.complete`"""
+
+        This can be passed directly as the tools parameters to 
+        :func:`Mistral.chat.complete`
+        """
         return  [ command.to_json() for command in self.commands.values() ]   
 
     def bind(self, **bound_parameters):
@@ -162,9 +183,11 @@ class CommandRegister():
 class BoundCommandRegister():
     """A command register with bound parameters.
 
-    This object behaves like the BoundCommandRegister, except bound commands can be accessed with the getitem operator like so:
+    This object behaves like the BoundCommandRegister, 
+    except bound commands can be accessed with the getitem operator like so:
 
     .. code-block:: python
+
         commands = CommandRegister(bindable_parameters=("df",))
 
         @commands.register(
@@ -182,6 +205,7 @@ class BoundCommandRegister():
     bound_parameters: dict[str, object]
 
     def __getitem__(self, name):
+        """Get a bound command by name"""
         if name in self.command_register.commands:
             command = self.command_register.commands[name]
             return self.bind_command(command)
@@ -244,7 +268,8 @@ class BoundCommandRegister():
         return self.command_register.to_json()
 
     def handle_returnable_error(self, error: ReturnableError):
-        """Convert a returnable error to a string. 
+        """Convert a returnable error to a string
+
         This can be overriden in a subclass to handle the errors differently"""
         return str(error)
 

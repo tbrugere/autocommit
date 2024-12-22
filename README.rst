@@ -39,4 +39,10 @@ This will
 - add a git hook to your repository to keep the RAG database up-to-date.
 
 
+Why ?
+-----
 
+.. figure:: doc/source/images/horror.png
+    :alt: screenshot of commit messages whose message is simply "update"
+
+    This is why

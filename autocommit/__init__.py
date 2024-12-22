@@ -1,3 +1,7 @@
+"""Main module for autocommit
+
+The toplevel module for autocommit mainly contains the command line interface.
+"""
 # Notice that in this file, most imports are done inside functions. 
 # This is to make the import / runs as snappy as possible
 # in particular
@@ -14,6 +18,7 @@ from argparse import ArgumentParser, BooleanOptionalAction
 from autocommit.utils import get_api_key, create_argument_parser
 log = getLogger(__name__)
 
+...
 """
 Argument parsers for the command line
 -------------------------------------
@@ -22,6 +27,7 @@ Argument parsers for the command line
 @create_argument_parser(description="Automatically generate commit messages"
                         " from changes, and print it to stdout")
 def run_argument_parser(parser: ArgumentParser): # noqa: D103
+    """Argument parser for the ``autocommit run`` command"""
     parser.add_argument("repo", help="Path to the repository", type=str, default=".", 
                         nargs='?')
     parser.add_argument("--key-file" , help="File containing a Mistral api key", 
@@ -33,6 +39,7 @@ def run_argument_parser(parser: ArgumentParser): # noqa: D103
 
 @create_argument_parser(description="Setup autocommit in the current repository")
 def setup_argument_parser(parser: ArgumentParser): # noqa: D103
+    """Argument parser for the ``autocommit setup`` command"""
     parser.add_argument("--isolation", action=BooleanOptionalAction,
                         help="Run the program in isolation mode", default=False)
     parser.add_argument("repo", help="Path to the repository", 
@@ -50,6 +57,7 @@ def setup_argument_parser(parser: ArgumentParser): # noqa: D103
 @create_argument_parser(description="Build or update the RAG database "
                         "from the repository")
 def build_ragdb_argument_parser(parser: ArgumentParser): # noqa: D103
+    """Argument parser for the ``autocommit build-ragdb`` command"""
     parser.add_argument("--key-file", help="Mistral API key", type=Path, required=False)
     parser.add_argument("repo", nargs="?", help="Path to the repository", 
                         type=str, default=".")
@@ -58,17 +66,20 @@ def build_ragdb_argument_parser(parser: ArgumentParser): # noqa: D103
 
 @create_argument_parser(description="handle the git prepare-commit-msg hook")
 def git_prepare_commit_msg_argument_parser(parser: ArgumentParser): # noqa: D103
+    """Argument parser for the ``autocommit git_prepare_commit_msg`` command"""
     parser.add_argument("message_file", type=Path)
     parser.add_argument("commit_type", type=str, nargs="?")
     parser.add_argument("sha", type=str, nargs="?")
 
 @create_argument_parser(description="handle the git post-commit hook")
 def git_post_commit_argument_parser(parser: ArgumentParser): # noqa: D103
+    """Argument parser for the ``autocommit git_post_commit`` command"""
     del parser # takes no arguments
 
 @create_argument_parser(
         description="Automatically generate commit messages from changes")
 def argument_parser(parser: ArgumentParser): # noqa: D103
+    """The main argument parser for the autocommit command line interface"""
     ############### logging (mostly stolen from https://stackoverflow.com/a/20663028/4948719)
     parser.add_argument(
         '-d', '--debug',
@@ -180,7 +191,7 @@ def main():
 def generate_commit_message(repo, key_file, use_rag=True, use_tools=False):
     """The main function for autocommit,
 
-    called when runninng `autocommit run` from the command line.
+    called when runninng ``autocommit run`` from the command line.
 
     This is a wrapper around :func:`autocommit.mistral_model.main` 
     that loads the api key, and prints the commit message to stdout.

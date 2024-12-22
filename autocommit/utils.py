@@ -57,11 +57,6 @@ class FileNewError(ReturnableError):
     def __init__(self, file: str):
         super().__init__("NewFile", f"File {file} is new, cannot print diff")
 
-class ParameterError(ReturnableError):
-    """Returned by the tool calls if a parameter is incorrect"""
-
-    def __init__(self, message: str):
-        super().__init__("ParameterError", message)
 
 """
 Git utils

@@ -7,6 +7,7 @@ class RateLimiter():
     usage example:
 
     .. code-block:: python
+
         rate_limiter = RateLimiter(1.0)
 
         for _ in range(10):
