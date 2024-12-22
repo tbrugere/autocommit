@@ -118,6 +118,7 @@ def create_argument_parser(**argparse_kwargs) \
     """Decorator that potentially creates an argument parser and passes it down
 
     This is a helper function that allows to have a function that either
+
     - populates an already existing parser 
         (if passed as argument, generally for use with subparsers)
     - creates an all new parser
