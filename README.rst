@@ -33,6 +33,7 @@ To use autocommit, simply run the following command in the root of your reposito
     $ autocommit setup --key-file <path-to-mistral-api-key>
 
 This will 
+
 - create a `.autocommit_storage_dir` (untracked) directory in the root of your repository with the RAG database and the Mistral API key.
 - add a git hook to your repository to automatically generate commit messages.
 - add a git hook to your repository to keep the RAG database up-to-date.
