@@ -1,9 +1,14 @@
 from pathlib import Path
+import shutil
 
 from autocommit.config import Config
 from autocommit.utils import get_api_key
 
 autocommit_storage_dir = Path(".autocommit_storage_dir")
+
+prepare_commit_msg_hook = "exec autocommit git_prepare_commit_msg \"$@\""
+post_commit_hook = "exec autocommit git_post_commit"
+
 
 def add_storage_dir_to_exclude(gitdir: Path):
     """Add .autocommit_storage_dir/ to the .git/info/exclude file
@@ -52,6 +57,34 @@ def add_commit_hook(repo: Path, *, hook_name="prepare-commit-msg", hook_content)
         with hook_path.open("a") as f:
             f.write("\n" + hook_content + "\n")
 
+def remove_commit_hook(repo: Path, *, hook_name="prepare-commit-msg", hook_content):
+    """Removes the commit hook from the repository"""
+    hook_path = repo / "hooks" / hook_name
+
+    import pdb; pdb.set_trace()
+    if not hook_path.exists():
+        return
+
+    lines = hook_path.read_text().splitlines()
+    if hook_content not in lines:
+        return
+    lines.remove(hook_content)
+    hook_path.write_text("\n".join(lines) + "\n")
+
+def get_repo_worktree(repo: Path, worktree: Path|None = None):
+    """Gets the repo and worktree paths"""
+    if worktree is not None and not check_repo_bare(repo):
+        raise ValueError("Cannot specify a worktree for a non-bare repository")
+
+    if worktree is None:
+        if check_repo_bare(repo):
+            raise ValueError("Cannot run setup on a bare repository"
+                             " without specifying a worktree")
+        worktree = repo
+        repo = repo / ".git"
+    assert worktree is not None
+    return repo, worktree
+
 
 def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None, 
               enable_rag: bool = True, enable_function_calls: bool = False):
@@ -68,17 +101,7 @@ def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None,
     if isolation:
         raise NotImplementedError("Isolation is not implemented yet")
 
-    if worktree is not None and not check_repo_bare(repo):
-        raise ValueError("Cannot specify a worktree for a non-bare repository")
-
-    if worktree is None:
-        if check_repo_bare(repo):
-            raise ValueError("Cannot run setup on a bare repository"
-                             " without specifying a worktree")
-        worktree = repo
-        repo = repo / ".git"
-    assert worktree is not None
-
+    repo, worktree = get_repo_worktree(repo, worktree)
     config.to_json_file(worktree / autocommit_storage_dir / "config.json")
 
     add_storage_dir_to_exclude(repo)
@@ -93,7 +116,26 @@ def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None,
     if enable_rag:
         from autocommit.build_ragdb import build_ragdb
         add_commit_hook(repo, hook_name="post-commit", 
-                        hook_content="exec autocommit git_post_commit")
+                        hook_content=post_commit_hook)
         build_ragdb(key, str(worktree), update=False)
+
+
+def run_cleanup(repo: Path, worktree: Path|None = None):
+    """Cleans up the autocommit setup"""
+    repo, worktree = get_repo_worktree(repo, worktree)
+    
+    dir = worktree / autocommit_storage_dir
+
+    if dir.exists():
+        shutil.rmtree(dir)
+    remove_commit_hook(repo, hook_name="prepare-commit-msg", 
+                       hook_content=prepare_commit_msg_hook)
+    remove_commit_hook(repo, hook_name="post-commit", 
+                       hook_content=post_commit_hook)
+
+
+        
+
+
 
 

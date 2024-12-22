@@ -54,6 +54,12 @@ def setup_argument_parser(parser: ArgumentParser): # noqa: D103
                     , 
                     type=Path, default=None)
 
+@create_argument_parser(description="Clenaup autocommit setup")
+def cleanup_argument_parser(parser: ArgumentParser):
+    """Argument parser for the ``autocommit cleanup`` command"""
+    parser.add_argument("repo", help="Path to the repository", 
+                        type=Path, default=".", nargs="?")
+
 @create_argument_parser(description="Build or update the RAG database "
                         "from the repository")
 def build_ragdb_argument_parser(parser: ArgumentParser): # noqa: D103
@@ -104,6 +110,9 @@ def argument_parser(parser: ArgumentParser): # noqa: D103
 
     setup_parser = subparsers.add_parser("setup")
     setup_argument_parser(setup_parser)
+
+    cleanup_parser = subparsers.add_parser("cleanup")
+    cleanup_argument_parser(cleanup_parser)
 
     build_ragdb_parser = subparsers.add_parser("build-ragdb")
     build_ragdb_argument_parser(build_ragdb_parser)
@@ -184,6 +193,9 @@ def main():
         case "git_post_commit":
             from autocommit.git_hooks import git_post_commit
             git_post_commit()
+        case "cleanup":
+            from autocommit.setup import run_cleanup
+            run_cleanup(args.repo)
         case _:
             raise ValueError(f"Unknown action {args.action}")
 
