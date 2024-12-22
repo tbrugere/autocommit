@@ -15,10 +15,10 @@ RUN_IN_ENV=poetry run
 	touch $@
 
 doc: .make/dev-deps 
-	cd doc && poetry run make html
+	cd docs && poetry run make html
 
 clean: .make/dev-deps
-	cd doc && poetry run make clean
+	cd docs && poetry run make clean
 
 .PHONY: doc
 
