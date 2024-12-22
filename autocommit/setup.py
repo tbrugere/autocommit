@@ -1,13 +1,14 @@
 from pathlib import Path
 import shutil
+from typing import Final
 
 from autocommit.config import Config
 from autocommit.utils import get_api_key
 
-autocommit_storage_dir = Path(".autocommit_storage_dir")
+autocommit_storage_dir: Final[Path] = Path(".autocommit_storage_dir")
 
-prepare_commit_msg_hook = "exec autocommit git_prepare_commit_msg \"$@\""
-post_commit_hook = "exec autocommit git_post_commit"
+prepare_commit_msg_hook: Final[str] = "exec autocommit git_prepare_commit_msg \"$@\""
+post_commit_hook: Final[str] = "exec autocommit git_post_commit"
 
 
 def add_storage_dir_to_exclude(gitdir: Path):
@@ -102,7 +103,10 @@ def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None,
         raise NotImplementedError("Isolation is not implemented yet")
 
     repo, worktree = get_repo_worktree(repo, worktree)
-    config.to_json_file(worktree / autocommit_storage_dir / "config.json")
+    dir = worktree / autocommit_storage_dir
+    dir.mkdir(exist_ok=True)
+
+    config.to_json_file(dir / "config.json")
 
     add_storage_dir_to_exclude(repo)
     _= add_key_to_tree(key, worktree)
