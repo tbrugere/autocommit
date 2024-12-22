@@ -28,10 +28,11 @@ def print_file(file: str, start_line: int=0, num_lines: int=200, staged:bool=Tru
     """Print the contents of the file.
 
     .. warning::
+
         this command does not actually read anything from the working directory, 
         only from git objects and the staging area.
         This is mainly for security reasons (we do not want to give the LLM access 
-                                             to the filesystem).
+        to the filesystem).
 
     Args:
         file (str): The file to print
@@ -186,7 +187,7 @@ def diff_file(file: str, context: int = 5, *, repository: Repository):
     return edited_text.getvalue()
 
 def diff_all_files(context: int = 5, *, repository: Repository, max_content_size=-1, 
-                   max_total_size=100_000):
+                   max_total_size=90_000):
     """Print the diff between the staged version and the head for all modified files
 
     Args:
