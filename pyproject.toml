@@ -28,6 +28,7 @@ sphinx-rtd-theme = "^3.0.2"
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.3"
 pytest-cov = "^6.0.0"
+pytest-retry = "^1.6.3"
 
 
 [build-system]
@@ -37,4 +38,3 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.scripts]
 autocommit = 'autocommit:main'
 
-[tool.pytest.ini_options]

@@ -15,6 +15,7 @@ from mistral_tools.utils import RateLimiter
 rate_limit = RateLimiter(1.05)
 
 
+@pytest.mark.flaky(retries=3)
 def test_conversation(api_key):
     model = "mistral-large-latest"
     tool_register = None
@@ -30,6 +31,7 @@ def test_conversation(api_key):
 
     assert response.message.content == "hello world"
 
+@pytest.mark.flaky(retries=3)
 def test_tool_calling(api_key):
     commands = CommandRegister(bindable_parameters=("df",))
 
@@ -59,16 +61,19 @@ def test_tool_calling(api_key):
         Please print the date of the transaction with id 1234. 
         Print the date in ISO 8601 format.
         Do not print anything else, only the date in iso format, no text or punctuation.
-                         """)
+        """)
 
     model = "mistral-large-latest"
 
-    conversation = ModelConversation(model=model, api_key=api_key, tool_register=tool_register, rate_limit=rate_limit)
+    conversation = ModelConversation(
+            model=model, api_key=api_key, tool_register=tool_register, 
+            rate_limit=rate_limit)
     
     conversation.add_message(date_prompt)
+    conversation.add_prefix("date: ")
     response_1 = conversation.send(tool_choice="auto")
     assert response_1.message.content == ""
     response_2 = conversation.send(tool_choice="none")
     assert called_retrieve_payment_date
     assert call_arguments == (data, "1234")
-    assert response_2.message.content == "2022-10-03"
+    assert response_2.message.content.strip() == "2022-10-03"

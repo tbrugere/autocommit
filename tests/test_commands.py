@@ -1,12 +1,11 @@
 from pathlib import Path
-import sys
 from textwrap import dedent
 
 import pygit2
 import pytest
 
 from autocommit.commands import print_file, ls_files, diff_file
-from autocommit.utils import FileNotFoundReturnableError, FileIsBinaryReturnableError, FileUnchangedError, FileNewError
+from autocommit.utils import FileNotFoundReturnableError 
 
 
 def commit(repo, message):
@@ -130,7 +129,7 @@ def test_diff_file(test_repository):
 
     rest = "\n".join(diff_lines[4:])
 
-    assert  rest == dedent(f"""\
+    assert  rest == dedent("""\
         @@ -1,3 +1,4 @@
         +Added stuff
          Hello World

@@ -4,7 +4,7 @@ RUN_IN_ENV=poetry run
 	mkdir -p .make
 
 .make/run-tests .coverage: .make/deps .make/test-deps |.make
-	$(RUN_IN_ENV) pytest
+	$(RUN_IN_ENV) pytest --cov=autocommit --cov=mistral_tools --cov=basic_rag
 
 coverage.xml: .make/run-tests
 	$(RUN_IN_ENV) coverage xml
@@ -22,6 +22,7 @@ doc: .make/dev-deps
 
 clean: .make/dev-deps
 	cd docs && poetry run make clean
+	-rm -rf .make .coverage coverage.xml
 
 .PHONY: doc
 
