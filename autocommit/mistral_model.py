@@ -102,7 +102,8 @@ def fix_formatting(content):
     if not body:
         body = ["# no body"]
 
-    return f"{title}\n\n{'\n'.join(body)}"
+    body_str = "\n".join(body)
+    return f"{title}\n\n{body_str}"
 
 
 
