@@ -1,7 +1,10 @@
+"""Test the rag database"""
 from pathlib import Path
 import random
 
 import pytest
+
+from _socket_toggle import disable_network
 
 from basic_rag import RAGDatabase
 
@@ -34,6 +37,9 @@ def rag_test_directory(tmp_path: Path):
         with file.open("w") as f:
             for lineno in range(length):
                 f.write(f"{file.name} - line {lineno}\n")
+
+    non_text_file = dir / "non_text_file"
+    non_text_file.write_bytes(random.randbytes(100))
     
     return dir
 
@@ -66,6 +72,22 @@ def test_chunks(rag_test_directory, tmp_rag_db, chunk_size = 7, overlap = 2):
         chunks_file.sort(key=lambda chunk: chunk.start_line)
         for i in range(1, len(chunks_file)):
             assert  chunks_file[i-1].end_line - chunks_file[i].start_line == overlap
+
+def test_update(tmp_rag_db, rag_test_directory, api_key):
+    files = list(rag_test_directory.glob("**/*.txt"))
+    rag_test_directory = rag_test_directory
+    chunk_size = 7
+    overlap = 2
+    tmp_rag_db.generate_index(files, overlap=overlap, chunk_size=chunk_size, 
+                              api_key=api_key)
+    tmp_rag_db.commit()
+    with disable_network():
+        tmp_rag_db.update_index(files, overlap=overlap, chunk_size=chunk_size, 
+                              api_key=api_key)
+        # should not raise an error, 
+        # because the update should not change anything, 
+        # since the files have not changes
+        # so no network access
 
 def test_retrieval(tmp_rag_db, rag_test_directory, api_key):
     """Check that if we look for the 1-nn of a chunk, we get the same chunk"""

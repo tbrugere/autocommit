@@ -53,6 +53,8 @@ class EmbeddingModel():
         filtered_mask = input_lengths >= self.max_n_tokens
         filtered = np.array(inputs, dtype=object)[~filtered_mask]
         embeddings_filtered = self.get_embeddings_batched_filtered(filtered,)
+        if embeddings_filtered is None:
+            return None, filtered_mask
         _, embed_size = embeddings_filtered.shape
         embeddings = np.zeros((len(inputs), embed_size))
         embeddings[~filtered_mask, :] = embeddings_filtered
@@ -65,6 +67,8 @@ class EmbeddingModel():
         assumes all inputs are smaller than the max n tokens
         """
         batch_results = []
+        if len(inputs_filtered) == 0:
+            return None
         inputs_it = iter(inputs_filtered)
         current_batch = []
         current_batch_size = 0

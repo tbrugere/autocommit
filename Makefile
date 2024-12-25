@@ -6,7 +6,7 @@ RUN_IN_ENV=poetry run
 .make/run-tests .coverage: .make/deps .make/test-deps |.make
 	$(RUN_IN_ENV) pytest --cov=autocommit --cov=mistral_tools --cov=basic_rag
 
-coverage.xml: .make/run-tests
+coverage.xml coverage.json: .coverage
 	$(RUN_IN_ENV) coverage xml
 
 .make/deps: pyproject.toml | .make

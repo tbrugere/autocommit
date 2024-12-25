@@ -1,3 +1,4 @@
+"""Basic RAG database"""
 from dataclasses import dataclass
 from typing import Sequence, Optional
 from hashlib import sha1
@@ -170,6 +171,8 @@ class RAGDatabase():
                                          max_n_tokens=self.max_n_tokens)
         embeddings, embeddings_too_long_filter = \
             embedding_model.get_embeddings_batched([c.text_chunk for c in all_chunks])
+        if embeddings is None:
+            return # no embedddings to add
 
         ids = []
 
@@ -212,6 +215,8 @@ class RAGDatabase():
                 api_key=api_key, model=self.model, max_n_tokens=self.max_n_tokens, 
                 rate_limit=self.rate_limit)
         query_embedding, _ = embedding_model.get_embeddings_batched([query])
+        if query_embedding is None:
+            raise RuntimeError("Query too long")
         scores, ids = self.index.search(query_embedding, k=n_results) # type: ignore
         chunks = [self.get_chunk_by_id(id) for id in ids[0]]
         return chunks, scores[0]
@@ -224,11 +229,13 @@ class RAGDatabase():
         Like generate_index, but preemptively checks which files have changed, 
         and only updates those.
         """
-        files_shas_in_db = self.db.execute("SELECT DISTINCT file_sha FROM rag").fetchall()
+        files_shas_in_db = self.db\
+                .execute("SELECT DISTINCT file_sha FROM rag")\
+                .fetchall()
         files_shas_in_db  = set([sha for sha, in files_shas_in_db])
         new_shas = []
         for file in files:
-            if isinstance(file, Path): hash = sha1(file.read_bytes())
+            if isinstance(file, Path): hash = sha1(file.read_bytes()).digest()
             else: hash = sha1(file).digest()
             new_shas.append(hash)
         new_shas = set(new_shas)
