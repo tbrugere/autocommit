@@ -20,7 +20,7 @@ You can simply install autocommit using pip:
 
 .. code-block:: console
 
-    $ pip install autocommit
+    $ pip install git_autocommit_hook
 
 
 Usage

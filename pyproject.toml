@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "autocommit"
+name = "git_autocommit_hook"
 version = "0.1.0"
 description = "Automatically generate commit messages from changes"
 authors = ["Tristan Brugère <67050900+tbrugere@users.noreply.github.com>"]
