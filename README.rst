@@ -26,7 +26,9 @@ You can simply install autocommit using pip:
 Usage
 -----
 
-To use autocommit, simply run the following command in the root of your repository:
+To use autocommit, you will need a Mistral API key. You can get one by signing up on the `Mistral website <https://mistral.ai/>`_, and then creating one from `the console <https://console.mistral.ai/api-keys/>`_.
+
+Then, you can simply run the following command in the root of your repository:
 
 .. code-block:: console
 

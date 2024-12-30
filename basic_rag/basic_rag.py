@@ -206,10 +206,12 @@ class RAGDatabase():
         res = self.db.execute("SELECT text_chunk, file_path, start_line, "
                               "end_line, file_sha FROM rag WHERE id = ?", 
                               (id,)).fetchone()
-        if res is None: return None
+        if res is None: 
+            raise ValueError(f"Chunk with id {id} not found")
         return TextChunk(*res)
 
-    def query(self, query, n_results=5, *, api_key):
+    def query(self, query, n_results=5, *, api_key) \
+            -> tuple[list[TextChunk], np.ndarray]:
         """Do a Knn search on the index"""
         embedding_model = EmbeddingModel(
                 api_key=api_key, model=self.model, max_n_tokens=self.max_n_tokens, 
@@ -218,7 +220,8 @@ class RAGDatabase():
         if query_embedding is None:
             raise RuntimeError("Query too long")
         scores, ids = self.index.search(query_embedding, k=n_results) # type: ignore
-        chunks = [self.get_chunk_by_id(id) for id in ids[0]]
+        chunks = [self.get_chunk_by_id(id) for id in ids[0]
+                  if id != -1] # -1 is returned when there are not enough results
         return chunks, scores[0]
 
         

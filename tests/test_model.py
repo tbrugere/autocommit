@@ -77,5 +77,5 @@ def test_tool_calling(api_key):
     response_2 = conversation.send(tool_choice="none")
     assert called_retrieve_payment_date
     assert call_arguments == (data, "1234")
-    # this was too flaky:
+    # commented this out because it was too flaky:
     # assert response_2.message.content.strip() == "2022-10-03"
