@@ -14,7 +14,8 @@ def test_autocommit(test_repository, api_key):
         _test_autocommit_inner(repo, repo_path, api_key)
     
 def _test_autocommit_inner(repo, repo_path, api_key):
-    api_key_env = dict(MISTRAL_API_KEY=api_key, **os.environ)
+    api_key_env = {**os.environ}
+    api_key_env["MISTRAL_API_KEY"] = api_key
     # 1. install autocommit to the repo
     process_1 = subprocess.run(("python", "-m", "autocommit", "setup"), 
                                env=api_key_env, 

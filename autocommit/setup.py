@@ -1,5 +1,6 @@
 from pathlib import Path
 import shutil
+import sys
 from typing import Final
 
 from autocommit.config import Config
@@ -112,6 +113,7 @@ def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None,
     _= add_key_to_tree(key, worktree)
 
     # git hooks
+    sys.stderr.write("Setting commit hooks...\n")
     autocommit_line = 'exec autocommit git_prepare_commit_msg \"$@\"'
     add_commit_hook(repo, hook_name="prepare-commit-msg",
                     hook_content=autocommit_line)
@@ -119,6 +121,7 @@ def run_setup(repo, isolation: bool, key=None, worktree: Path|None =None,
     # build ragdb
     if enable_rag:
         from autocommit.build_ragdb import build_ragdb
+        sys.stderr.write("Indexing repository, this may take a minute...\n")
         add_commit_hook(repo, hook_name="post-commit", 
                         hook_content=post_commit_hook)
         build_ragdb(key, str(worktree), update=False)
