@@ -1,6 +1,24 @@
 Autocommit: automatically write commit messages
 ===============================================
 
+.. Shields
+
+.. image:: https://img.shields.io/pypi/v/git_autocommit_hook
+    :alt: PyPI - Version
+    :target: https://pypi.org/project/git-autocommit-hook/
+.. image:: https://github.com/tbrugere/autocommit/actions/workflows/ci_cd.yaml/badge.svg?branch=main
+    :alt: CI/CD status
+    :target: https://github.com/tbrugere/autocommit/actions/workflows/ci_cd.yaml
+.. image:: https://codecov.io/gh/tbrugere/autocommit/graph/badge.svg?token=REjhBU81RH 
+    :alt: Coverage percentage
+    :target: https://codecov.io/gh/tbrugere/autocommit
+.. image:: https://img.shields.io/badge/documentation-green?logo=readme
+    :alt: Documentation
+    :target: https://tristan.bruge.re/documentation/autocommit/
+
+.. End shields
+
+
 Uses the `Mistral api <https://mistral.ai/>`_ to pre-generate a commit message for you.
 
 .. image:: .readme-images/autocommit.gif
