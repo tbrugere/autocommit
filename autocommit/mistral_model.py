@@ -14,7 +14,7 @@ from mistral_tools.utils import RateLimiter
 
 def get_prompt(prompt_file):
     """Load a prompt from a resource file"""
-    resource_files = resources.files("autocommit.mistral_model")
+    resource_files = resources.files("autocommit")
     prompts = resource_files / "prompts"
     lines = (prompts / prompt_file).read_text().splitlines()
     lines = [l for l in lines if not l.startswith("#")] # remove comments
