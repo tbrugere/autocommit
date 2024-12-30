@@ -101,9 +101,14 @@ jobs:
       - test-and-build
     permissions:
       id-token: write
+      contents: write
     if: ${{ needs.check-version.outputs.is_latest_version == 'true' }}
     steps:
       - uses: actions/checkout@v4
+      - name: setup git
+        run: |
+          git config --global user.name "${GITHUB_ACTOR}"
+          git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
       - name: Create tag
         run: git tag -a "${{ needs.check-version.outputs.version }}" -m "version ${{ needs.check-version.outputs.version }}"
       - name: Push tag
